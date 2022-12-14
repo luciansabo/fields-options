@@ -1,0 +1,11 @@
+# git
+.git
+
+# phpunit cache
+.phpunit.result.cache
+
+# phpstorm
+.idea/
+
+# composer
+/vendor

@@ -210,28 +210,55 @@ Its goal is to only decode and encapsulate the client field options.
 
 It is up to the caller to honor these field options.
 
-The method `parse(string $s)` from the Parser class will return an instance of `FieldsOptions`.
-
 To retrieve a path use the dot notation.
 
+Assuming this json structure was sent on the request:
+```json
+{
+    "_defaults":true,
+    "id":true,
+    "seo":false,
+    "profile":{
+        "education":{
+            "_all":true,
+            "_opt":{
+                "limit":1,
+                "sort":"startYear",
+                "sortDir":"asc"
+            }
+        }
+    }
+}
+```
+
 ```php
-use Lucian\FieldsOptions\Parser;
+use Lucian\FieldsOptions\FieldsOptions;
 
 // assuming we use the Symfony request
 // $request = Request:::createFromGlobals();
+$data = json_decode($request->getContent());
 
-$parser = new Parser();
-// fields=id,profile{presentation{bar{other}}},documents{images(limit=10,order=name)}
+//?fields=%7B%22_defaults%22%3Atrue%2C%22id%22%3Atrue%2C%22seo%22%3Afalse%2C%22profile%22%3A%7B%22education%22%3A%7B%22_all%22%3Atrue%2C%22_opt%22%3A%7B%22limit%22%3A1%2C%22sort%22%3A%22startYear%22%2C%22sortDir%22%3A%22asc%22%7D%7D%7D%7D
 
-$options = $parser->parse($request->get('fields'));
+$options = FieldsOptions::fromArray($data);
 
-var_dump($options->isFieldPresent('profile.presentation.bar.other')); // true
-var_dump($options->isFieldPresent('profile.missing')); // false
-var_dump($options->isFieldPresent('missing')); // false
-var_dump($options->getFieldOption('documents.images', 'limit'))); // 10
-var_dump($options->getFieldOption('documents.images', 'missing', 1))); // 1 -> default
-var_dump($options->getFieldOptions('documents.images'))); // ['limit' => '10', 'order' => 'name']
+$options->isFieldIncluded('id'); // true
+$options->isFieldIncluded('missing'); // false
+// field is present but value is false
+$options->isFieldIncluded('seo'); // false
+$options->isFieldIncluded('profile'); // true
+$options->isFieldIncluded('profile.education'); // true
+$options->getFieldOption('profile.education', 'limit'); // 1
+$options->getFieldOption('profile.education', 'missing', 1); // 1 - default
+$options->getFieldOption('profile.education', 'missing'); // null - default
 
+// field groups
+$options->hasDefaultFields(); // true
+$options->hasDefaultFields('profile'); // false
+$options->hasAllFields('profile'); // false
+$options->hasAllFields('profile.education'); // true
+$options->hasAllFields('profiles.missing'); // throws exception
+        
 // you can export the entire structure
 $array = $options->toArray();
 ```

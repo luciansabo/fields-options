@@ -184,15 +184,15 @@ This brings the default fields from the institution object. Assuming all are ret
 ```
 
 #### Example 2
-To retrieve from the `profile` only the first institution's name, ordered by `startYear` you can make `_all` or `_defaults` false
-and specify that you still need the institution name
+To retrieve from the `profile`'s education all fields except the institution's name, ordered by `startYear`
+you can make `_all` `true` and set the  `institutionName` to `false`.
 
 ```json
 {
     "profile": {
         "education": {
-            "_all": false,
-            "institutionName": true,
+            "_all": true,
+            "institutionName": false,
             "_opt": {
                 "limit": 1,
                 "sort": "startYear",
@@ -202,6 +202,22 @@ and specify that you still need the institution name
     }
 }
 ```
+
+Result:
+
+```json
+{
+    "profile": {
+        "education": [
+            {
+                "startYear": 1998,
+                "endYear": 2000
+            }
+        ]
+    }
+}
+```
+
 
 ## Using the library
 
@@ -215,16 +231,16 @@ To retrieve a path use the dot notation.
 Assuming this json structure was sent on the request:
 ```json
 {
-    "_defaults":true,
-    "id":true,
-    "seo":false,
-    "profile":{
-        "education":{
-            "_all":true,
-            "_opt":{
-                "limit":1,
-                "sort":"startYear",
-                "sortDir":"asc"
+    "_defaults": true,
+    "id": true,
+    "seo": false,
+    "profile": {
+        "education": {
+            "_all": true,
+            "_opt": {
+                "limit": 1,
+                "sort": "startYear",
+                "sortDir": "asc"
             }
         }
     }

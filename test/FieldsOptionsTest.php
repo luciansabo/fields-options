@@ -4,7 +4,6 @@ namespace Lucian\FieldsOptions\Test\Unit;
 
 use Lucian\FieldsOptions\FieldsOptions;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\PropertyAccess\PropertyAccessor;
 
 class FieldsOptionsTest extends TestCase
 {
@@ -52,6 +51,14 @@ class FieldsOptionsTest extends TestCase
         $options = FieldsOptions::fromArray(['field' => true]);
         $this->expectException(\InvalidArgumentException::class);
         $options->getFieldOptions('missing');
+    }
+
+    public function testGetIncludedFields()
+    {
+        $data = $this->getSampleData();
+        $options = FieldsOptions::fromArray($data);
+        $this->assertEquals(['_defaults', 'id', 'profile'], $options->getIncludedFields());
+        $this->assertEquals(['education'], $options->getIncludedFields('profile'));
     }
 
     public function testToArray()

@@ -37,9 +37,7 @@ class FieldsOptions
 
     public function getFieldOptions(string $fieldPath): array
     {
-        if (!$this->fieldExists($fieldPath)) {
-            throw new \InvalidArgumentException(sprintf('Field %s is not available', $fieldPath));
-        }
+        $this->assertFieldExists($fieldPath);
 
         return ArrayExtractor::getValue($this->data, $fieldPath . '.' . self::OPTIONS_KEY, []);
     }
@@ -73,8 +71,40 @@ class FieldsOptions
         return $this->hasGroupField(self::FIELD_ALL, $fieldPath);
     }
 
+    public function getIncludedFields(?string $fieldPath = null): array
+    {
+        if ($fieldPath) {
+            $this->assertFieldExists($fieldPath);
+        }
+
+        $data = ArrayExtractor::getValue($this->data, $fieldPath);
+        $fields = [];
+        if (is_array($data)) {
+            foreach ($data as $field => $value) {
+                $_fieldPath = $fieldPath ? ($fieldPath . '.' . $field) : $field;
+                if ($this->isFieldIncluded($_fieldPath)) {
+                    $fields[] = $field;
+                }
+            }
+        }
+
+        return $fields;
+    }
+
     private function fieldExists(string $fieldPath): bool
     {
         return ArrayExtractor::getValue($this->data, $fieldPath, '-123qwerty') !== '-123qwerty';
+    }
+
+    /**
+     * @param string $fieldPath
+     * @return void
+     * @throws \InvalidArgumentException
+     */
+    private function assertFieldExists(string $fieldPath)
+    {
+        if (!$this->fieldExists($fieldPath)) {
+            throw new \InvalidArgumentException(sprintf('Field "%s" is not available', $fieldPath));
+        }
     }
 }

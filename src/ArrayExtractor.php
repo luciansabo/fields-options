@@ -7,7 +7,7 @@ namespace Lucian\FieldsOptions;
  */
 class ArrayExtractor
 {
-    public static function getValue(array $array, ?string $key, /*mixed*/ $default = null): mixed
+    public static function getValue(array $array, ?string $key, /*mixed*/ $default = null)/*: mixed*/
     {
         if (is_string($key)) {
             $keys = explode('.', $key);

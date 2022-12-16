@@ -15,7 +15,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Lucian\\FieldsOptions\\Test\\": "test/"
+            "Lucian\\FieldsOptions\\Test\\": "tests/"
         }
     },
     "authors": [

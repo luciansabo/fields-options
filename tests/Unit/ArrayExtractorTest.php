@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 class ArrayExtractorTest extends TestCase
 {
     private const SAMPLE = [
-        'test' => 'testValue',
+        'tests' => 'testValue',
         'test2' => [
             'child1' => [
                 'child2' => 'testChild1Child2Value'
@@ -30,7 +30,7 @@ class ArrayExtractorTest extends TestCase
     protected function getTestCases()
     {
         return [
-            ['test', null, 'testValue'],
+            ['tests', null, 'testValue'],
             ['missing', null, null],
             ['missing', 'default', 'default'],
             ['test2.child1', null, ['child2' => 'testChild1Child2Value']],

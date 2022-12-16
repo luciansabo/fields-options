@@ -1,0 +1,54 @@
+name: PHP Composer
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Cache Composer dependencies
+      uses: actions/cache@v2
+      with:
+        path: /tmp/composer-cache
+        key: ${{ runner.os }}-${{ hashFiles('**/composer.lock') }}
+
+    - name: Install dependencies
+      uses: php-actions/composer@v5
+      with:
+        dev: yes
+        args: --profile --ignore-platform-reqs
+        php_version: 8.0
+        version: 2
+
+    - name: PHPUnit Tests - 7.4
+      uses: php-actions/phpunit@dynamic-docker
+      with:
+        bootstrap: vendor/autoload.php
+        args: --coverage-text
+        configuration: phpunit.xml
+        php_version: 7.4
+
+    - name: PHPUnit Tests - 8.1
+      uses: php-actions/phpunit@dynamic-docker
+      with:
+          bootstrap: vendor/autoload.php
+          args: --coverage-text
+          configuration: phpunit.xml
+          php_version: 8.1
+
+
+    - name: PHP Code sniffer
+      uses: tinovyatkin/action-php-codesniffer@v1
+      with:
+        phpcs_path: vendor/bin/phpcs
+
+    - name: Psalm Static Analysis
+      run: ./vendor/bin/psalm

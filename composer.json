@@ -2,6 +2,9 @@
     "name": "luciansabo/fields-options",
     "description": "Standard format for retrieving nested fields and field options in RESTful APIs",
     "type": "library",
+    "require": {
+        "php": ">=7.4"
+    },
     "require-dev": {
         "phpunit/phpunit": "^9.5",
         "vimeo/psalm": "^5.0",

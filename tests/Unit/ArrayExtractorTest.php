@@ -27,7 +27,7 @@ class ArrayExtractorTest extends TestCase
         $this->assertEquals($expected, ArrayExtractor::getValue(self::SAMPLE, $path, $default));
     }
 
-    protected function getTestCases()
+    public function getTestCases()
     {
         return [
             ['tests', null, 'testValue'],

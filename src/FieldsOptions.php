@@ -42,7 +42,7 @@ class FieldsOptions
         return ArrayExtractor::getValue($this->data, $fieldPath . '.' . self::OPTIONS_KEY, []);
     }
 
-    public function getFieldOption(string $fieldPath, string $option, mixed $default = null): ?string
+    public function getFieldOption(string $fieldPath, string $option, /*mixed*/ $default = null): ?string
     {
         $options = $this->getFieldOptions($fieldPath);
         return $options[$option] ?? $default;

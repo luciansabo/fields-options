@@ -7,9 +7,9 @@ namespace Lucian\FieldsOptions;
  */
 class FieldsOptions
 {
-    private const OPTIONS_KEY = '_opt';
-    private const FIELD_DEFAULTS = '_defaults';
-    private const FIELD_ALL = '_all';
+    public const OPTIONS_KEY = '_opt';
+    public const FIELD_DEFAULTS = '_defaults';
+    public const FIELD_ALL = '_all';
     private array $data = [];
 
     public const DEFAULT_GROUPS = [
@@ -17,12 +17,10 @@ class FieldsOptions
         self::FIELD_ALL
     ];
 
-    public static function fromArray(array $data): self
+    public function __construct(array $data)
     {
-        $instance = new self();
-        $instance->data = $data;
-
-        return $instance;
+        static::validate($data);
+        $this->data = $data;
     }
 
     public function toArray(): array
@@ -32,14 +30,14 @@ class FieldsOptions
 
     public function isFieldIncluded(string $fieldPath): bool
     {
-        return ArrayExtractor::getValue($this->data, $fieldPath, false) !== false;
+        return ArrayHelper::getValue($this->data, $fieldPath, false) !== false;
     }
 
     public function getFieldOptions(string $fieldPath): array
     {
         $this->assertFieldExists($fieldPath);
 
-        return ArrayExtractor::getValue($this->data, $fieldPath . '.' . self::OPTIONS_KEY, []);
+        return ArrayHelper::getValue($this->data, $fieldPath . '.' . self::OPTIONS_KEY, []);
     }
 
     public function getFieldOption(string $fieldPath, string $option, /*mixed*/ $default = null): ?string
@@ -77,7 +75,7 @@ class FieldsOptions
             $this->assertFieldExists($fieldPath);
         }
 
-        $data = ArrayExtractor::getValue($this->data, $fieldPath);
+        $data = ArrayHelper::getValue($this->data, $fieldPath);
         $fields = [];
         if (is_array($data)) {
             foreach ($data as $field => $value) {
@@ -91,9 +89,24 @@ class FieldsOptions
         return $fields;
     }
 
+    private static function validate(array $data): void
+    {
+        foreach ($data as $key => $datum) {
+            if ($key == self::OPTIONS_KEY) {
+                continue;
+            }
+
+            if (is_array($datum)) {
+                static::validate($datum);
+            } else if (!is_bool($datum)) {
+                throw new \RuntimeException('Invalid field options: ' . $key);
+            }
+        }
+    }
+
     private function fieldExists(string $fieldPath): bool
     {
-        return ArrayExtractor::getValue($this->data, $fieldPath, '-123qwerty') !== '-123qwerty';
+        return ArrayHelper::getValue($this->data, $fieldPath, '-123qwerty') !== '-123qwerty';
     }
 
     /**

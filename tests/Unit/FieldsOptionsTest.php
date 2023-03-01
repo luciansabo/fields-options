@@ -7,11 +7,11 @@ use PHPUnit\Framework\TestCase;
 
 class FieldsOptionsTest extends TestCase
 {
-    public function testFromArray()
+    public function testConstruct()
     {
         $data = $this->getSampleData();
 
-        $options = FieldsOptions::fromArray($data);
+        $options = new FieldsOptions($data);
         $this->assertTrue($options->isFieldIncluded('id'));
         $this->assertFalse($options->isFieldIncluded('missing'));
         // field is present but value is false
@@ -33,22 +33,29 @@ class FieldsOptionsTest extends TestCase
         $this->assertEquals($options->getFieldOptions('profile.education'), $data['profile']['education']['_opt']);
     }
 
+    public function testConstructWithInvalidData()
+    {
+        $this->expectException(\RuntimeException::class);
+        new FieldsOptions(['id' => true, 'profile' => 'invalid']);
+    }
+
     public function testFieldGroups()
     {
         $data = $this->getSampleData();
-        $options = FieldsOptions::fromArray($data);
+        $options = new FieldsOptions($data);
         $this->assertTrue($options->hasDefaultFields());
         $this->assertFalse($options->hasDefaultFields('profile'));
+        $this->assertTrue($options->hasGroupField('_basicInfo'));
         $this->assertFalse($options->hasAllFields('profile'));
         $this->assertTrue($options->hasAllFields('profile.education'));
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectErrorMessage('not available');
+        $this->expectExceptionMessage('not available');
         $options->hasAllFields('profiles.missing');
     }
 
     public function testMissingFieldGetOptionsThrowsException()
     {
-        $options = FieldsOptions::fromArray(['field' => true]);
+        $options = new FieldsOptions(['field' => true]);
         $this->expectException(\InvalidArgumentException::class);
         $options->getFieldOptions('missing');
     }
@@ -56,15 +63,15 @@ class FieldsOptionsTest extends TestCase
     public function testGetIncludedFields()
     {
         $data = $this->getSampleData();
-        $options = FieldsOptions::fromArray($data);
-        $this->assertEquals(['_defaults', 'id', 'profile'], $options->getIncludedFields());
+        $options = new FieldsOptions($data);
+        $this->assertEquals(['_defaults', '_basicInfo', 'id', 'profile'], $options->getIncludedFields());
         $this->assertEquals(['education'], $options->getIncludedFields('profile'));
     }
 
     public function testToArray()
     {
         $data = $this->getSampleData();
-        $options = FieldsOptions::fromArray($data);
+        $options = new FieldsOptions($data);
         $this->assertEquals($data, $options->toArray());
     }
 
@@ -72,6 +79,7 @@ class FieldsOptionsTest extends TestCase
     {
         return [
             '_defaults' => true,
+            '_basicInfo' => true,
             'id'       => true,
             'seo'      => false,
             'profile'  =>

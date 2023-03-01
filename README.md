@@ -247,6 +247,46 @@ Assuming this json structure was sent on the request:
 }
 ```
 
+### FieldsOptionsBuilder
+
+The earlier json structure of fields options can be configured programmatically using the builder.
+In general, it is recommended to use the builder instead of manually creating the array.
+
+```php
+use Lucian\FieldsOptions\FieldsOptionsBuilder;
+$builder = new FieldsOptionsBuilder();
+$fieldsOptions = $builder
+    ->setDefaultFieldsIncluded()
+    ->setFieldIncluded('id')
+    ->setFieldExcluded('seo')
+    ->setAllFieldsIncluded('profile.education')
+    ->setFieldOption('profile.education', 'limit', 1)
+    ->setFieldOption('profile.education', 'sort', 'startYear')
+    ->setFieldOption('profile.education', 'sortDir', 'asc')
+    ->build()
+````
+
+You also have methods to set all the options for a field at once
+
+`public function setFieldOptions(string $fieldPath, array $options): self`
+
+```php
+$educationOptions = ['limit' => 2, 'offset' => 5];
+$builder->setFieldOptions('profile.education', $educationOptions);
+```
+
+You can set a custom group field included
+
+`public function setGroupFieldIncluded(string $groupField, ?string $fieldPath = null): self`
+
+```php
+$fieldsOptions = $builder->setGroupFieldIncluded('_basicInfo', 'profile')
+    ->build();
+$fieldsOptions->hasGroupField('_basicInfo', 'profile') // true
+```
+
+### Using the FieldsOptions class
+
 ```php
 use Lucian\FieldsOptions\FieldsOptions;
 
@@ -256,7 +296,7 @@ $data = json_decode($request->getContent());
 
 //?fields=%7B%22_defaults%22%3Atrue%2C%22id%22%3Atrue%2C%22seo%22%3Afalse%2C%22profile%22%3A%7B%22education%22%3A%7B%22_all%22%3Atrue%2C%22_opt%22%3A%7B%22limit%22%3A1%2C%22sort%22%3A%22startYear%22%2C%22sortDir%22%3A%22asc%22%7D%7D%7D%7D
 
-$options = FieldsOptions::fromArray($data);
+$options = new FieldsOptions($data);
 
 $options->isFieldIncluded('id'); // true
 $options->isFieldIncluded('missing'); // false

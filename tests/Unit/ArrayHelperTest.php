@@ -2,10 +2,10 @@
 
 namespace Lucian\FieldsOptions\Test\Unit;
 
-use Lucian\FieldsOptions\ArrayExtractor;
+use Lucian\FieldsOptions\ArrayHelper;
 use PHPUnit\Framework\TestCase;
 
-class ArrayExtractorTest extends TestCase
+class ArrayHelperTest extends TestCase
 {
     private const SAMPLE = [
         'tests' => 'testValue',
@@ -24,7 +24,7 @@ class ArrayExtractorTest extends TestCase
      */
     public function testGetValue(string $path, $default, $expected)
     {
-        $this->assertEquals($expected, ArrayExtractor::getValue(self::SAMPLE, $path, $default));
+        $this->assertEquals($expected, ArrayHelper::getValue(self::SAMPLE, $path, $default));
     }
 
     public function getTestCases()

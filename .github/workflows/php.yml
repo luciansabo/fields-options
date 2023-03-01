@@ -29,21 +29,31 @@ jobs:
         version: 2
 
     - name: PHPUnit Tests - 7.4
-      uses: php-actions/phpunit@v9.6
+      uses: php-actions/phpunit@v3
       with:
         bootstrap: vendor/autoload.php
         args: --coverage-text
         configuration: phpunit.xml
         php_version: 7.4
+        version: 9.6
 
     - name: PHPUnit Tests - 8.1
-      uses: php-actions/phpunit@v9.6
+      uses: php-actions/phpunit@v3
       with:
           bootstrap: vendor/autoload.php
           args: --coverage-text
           configuration: phpunit.xml
           php_version: 8.1
+          version: 9.6
 
+    - name: PHPUnit Tests - 8.2
+      uses: php-actions/phpunit@v3
+      with:
+          bootstrap: vendor/autoload.php
+          args: --coverage-text
+          configuration: phpunit.xml
+          php_version: 8.2
+          version: 9.6
 
     - name: PHP Code sniffer
       uses: tinovyatkin/action-php-codesniffer@v1

@@ -29,7 +29,7 @@ jobs:
         version: 2
 
     - name: PHPUnit Tests - 7.4
-      uses: php-actions/phpunit@dynamic-docker
+      uses: php-actions/phpunit@v9.6
       with:
         bootstrap: vendor/autoload.php
         args: --coverage-text
@@ -37,7 +37,7 @@ jobs:
         php_version: 7.4
 
     - name: PHPUnit Tests - 8.1
-      uses: php-actions/phpunit@dynamic-docker
+      uses: php-actions/phpunit@v9.6
       with:
           bootstrap: vendor/autoload.php
           args: --coverage-text

@@ -73,6 +73,7 @@ class FieldsOptionsTest extends TestCase
         $data = $this->getSampleData();
         $options = new FieldsOptions($data);
         $this->assertEquals($data, $options->toArray());
+        $this->assertEquals($data['profile']['education'], $options->toArray('profile.education'));
     }
 
     private function getSampleData()

@@ -23,9 +23,15 @@ class FieldsOptions
         $this->data = $data;
     }
 
-    public function toArray(): array
+    /**
+     * Export an array structure for a given path
+     *
+     * @param string|null $fieldPath
+     * @return array
+     */
+    public function toArray(string $fieldPath = null): array
     {
-        return $this->data;
+        return ArrayHelper::getValue($this->data, $fieldPath);
     }
 
     public function isFieldIncluded(string $fieldPath): bool

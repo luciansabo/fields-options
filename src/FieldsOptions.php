@@ -17,7 +17,7 @@ class FieldsOptions
         self::FIELD_ALL
     ];
 
-    public function __construct(array $data)
+    public function __construct(array $data = [])
     {
         static::validate($data);
         $this->data = $data;

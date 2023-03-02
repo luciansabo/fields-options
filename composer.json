@@ -10,7 +10,7 @@
         "vimeo/psalm": "^5.0",
         "squizlabs/php_codesniffer": "^3.7"
     },
-    "license": "BSD",
+    "license": "MIT",
     "autoload": {
         "psr-4": {
             "Lucian\\FieldsOptions\\": "src/"

@@ -264,7 +264,17 @@ $fieldsOptions = $builder
     ->setFieldOption('profile.education', 'sort', 'startYear')
     ->setFieldOption('profile.education', 'sortDir', 'asc')
     ->build()
-````
+```
+
+You can include or exclude multiple fields at once from a given path
+```php
+$fieldsOptions = $this->builder
+    ->setFieldIncluded(null, ['name']) // this is equivalent to setFieldIncluded('name') 
+    ->setFieldIncluded('profile', ['workHistory']) // include profile.workHistory
+    ->setFieldExcluded('profile.workHistory', ['institution']) // but exclude profile.workHistory.institution
+    ->setFieldIncluded('profile.education', ['id', 'name']) // include profile.education.id and profile.education.name    
+    ->build();
+```
 
 You also have methods to set all the options for a field at once
 

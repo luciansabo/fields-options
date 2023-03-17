@@ -5,16 +5,50 @@ namespace Lucian\FieldsOptions;
 class FieldsOptionsBuilder
 {
     private array $data = [];
-    public function setFieldIncluded(string $fieldPath): self
-    {
-        ArrayHelper::setValue($this->data, $fieldPath, true);
 
-        return $this;
+    /**
+     * Include fields from given path
+     *
+     * @param string|null $fieldPath Base path
+     * @param array $fields Optional list of included fields
+     * @return $this
+     * @psalm-suppress LessSpecificReturnStatement
+     * @psalm-suppress MoreSpecificReturnType
+     */
+
+    public function setFieldIncluded(?string $fieldPath, array $fields = []): self
+    {
+        return $this->setFieldInclusion($fieldPath, $fields, true);
     }
 
-    public function setFieldExcluded(string $fieldPath): self
+    /**
+     * Exclude fields from given path
+     *
+     * @param string|null $fieldPath Base path
+     * @param array $fields Optional list of excluded fields
+     * @return $this
+     * @psalm-suppress LessSpecificReturnStatement
+     * @psalm-suppress MoreSpecificReturnType
+     */
+    public function setFieldExcluded(?string $fieldPath, array $fields = []): self
     {
-        ArrayHelper::setValue($this->data, $fieldPath, false);
+        return $this->setFieldInclusion($fieldPath, $fields, false);
+    }
+
+    private function setFieldInclusion(?string $fieldPath, array $fields, bool $isIncluded): self
+    {
+        if (empty($fieldPath) && empty($fields)) {
+            throw new \LogicException('No fields provided');
+        }
+
+        if (empty($fields)) {
+            ArrayHelper::setValue($this->data, $fieldPath, $isIncluded);
+        } else {
+            $basePath = $fieldPath ? "$fieldPath." : $fieldPath;
+            foreach ($fields as $field) {
+                ArrayHelper::setValue($this->data, $basePath . $field, $isIncluded);
+            }
+        }
 
         return $this;
     }

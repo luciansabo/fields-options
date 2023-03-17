@@ -1,0 +1,14 @@
+### 1.3
+
+- setFieldIncluded and setFieldExcluded can now include/exclude multiple fields from given path
+
+### 1.2
+
+- FieldsOptions::toArray() now receives an optional path
+
+### 1.1.1
+
+- made $data optional in constructor
+
+### 1.1.0
+- added FieldsOptionsBuilder

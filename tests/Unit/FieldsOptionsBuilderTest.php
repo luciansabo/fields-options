@@ -25,6 +25,41 @@ class FieldsOptionsBuilderTest extends TestCase
         $this->assertTrue($fieldsOptions->isFieldIncluded('test'));
         $this->assertTrue($fieldsOptions->isFieldIncluded('profile.education'));
         $this->assertEquals(['education'], $fieldsOptions->getIncludedFields('profile'));
+
+        $this->expectException(\LogicException::class);
+        $this->builder
+            ->setFieldIncluded(null);
+    }
+
+    public function testSetFieldsIncluded()
+    {
+        // root fields
+        $fieldsOptions = $this->builder
+            ->setFieldIncluded(null, ['test', 'profile.education'])
+            ->build();
+
+        $this->assertTrue($fieldsOptions->isFieldIncluded('test'));
+        $this->assertTrue($fieldsOptions->isFieldIncluded('profile.education'));
+
+        // child fields
+        $fieldsOptions = $this->builder
+            ->setFieldIncluded('profile', ['workHistory', 'education'])
+            ->build();
+
+        $this->assertTrue($fieldsOptions->isFieldIncluded('profile.workHistory'));
+        $this->assertTrue($fieldsOptions->isFieldIncluded('profile.education'));
+
+        // complex + nested child fields
+        $fieldsOptions = $this->builder
+            ->setFieldIncluded(null, ['name'])
+            ->setFieldIncluded('profile', ['workHistory'])
+            ->setFieldIncluded('profile.education', ['id', 'name'])
+            ->build();
+
+        $this->assertTrue($fieldsOptions->isFieldIncluded('name'));
+        $this->assertTrue($fieldsOptions->isFieldIncluded('profile.workHistory'));
+        $this->assertTrue($fieldsOptions->isFieldIncluded('profile.education.id'));
+        $this->assertTrue($fieldsOptions->isFieldIncluded('profile.education.name'));
     }
 
     public function testSetFieldExcluded()
@@ -38,6 +73,26 @@ class FieldsOptionsBuilderTest extends TestCase
         $this->assertFalse($fieldsOptions->isFieldIncluded('test'));
         $this->assertFalse($fieldsOptions->isFieldIncluded('profile.education'));
         $this->assertEquals(['name'], $fieldsOptions->getIncludedFields('profile'));
+
+        // child fields
+        $fieldsOptions = $this->builder
+            ->setFieldExcluded('profile', ['workHistory', 'education'])
+            ->build();
+
+        $this->assertFalse($fieldsOptions->isFieldIncluded('profile.workHistory'));
+        $this->assertFalse($fieldsOptions->isFieldIncluded('profile.education'));
+
+        // complex + nested child fields
+        $fieldsOptions = $this->builder
+            ->setFieldExcluded(null, ['name'])
+            ->setFieldExcluded('profile', ['workHistory'])
+            ->setFieldExcluded('profile.education', ['id', 'name'])
+            ->build();
+
+        $this->assertFalse($fieldsOptions->isFieldIncluded('name'));
+        $this->assertFalse($fieldsOptions->isFieldIncluded('profile.workHistory'));
+        $this->assertFalse($fieldsOptions->isFieldIncluded('profile.education.id'));
+        $this->assertFalse($fieldsOptions->isFieldIncluded('profile.education.name'));
     }
 
     public function testSetFieldOption()

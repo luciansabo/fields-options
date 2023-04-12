@@ -173,6 +173,10 @@ class FieldsOptionsBuilder
             }
 
             $reflectionProperty = $objectReflection->getProperty($property);
+            // needed for php 7.4, not needed for 8.1
+            if (!$reflectionProperty->isPublic()) {
+                $reflectionProperty->setAccessible(true);
+            }
             $type = $reflectionProperty->getType();
 
             if ($type && $type->isBuiltin()) {

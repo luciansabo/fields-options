@@ -72,8 +72,9 @@ There are two special groups: `_defaults` and `_all`.
 
 #### _defaults group
 
-`_defaults` is assumed `true` for a field nested fields if you only specify the parent field and you don't provide a list of nested fields.
-there is no point in setting it to `true`.
+`_defaults` is assumed `true` for a field nested fields if you only specify the parent field, and you don't provide a list of nested fields.
+`_defaults` is implicit `true` only when you don't have a list of fields for root or for a sub-field.
+When you specify a list of fields, it is considered `false`, and you have to be explicit to include the default fields too. 
 
 In this case there is no list of fields, so we will assume you want to export the default fields from profile:
 

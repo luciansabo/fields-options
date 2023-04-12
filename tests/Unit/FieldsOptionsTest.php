@@ -7,30 +7,39 @@ use PHPUnit\Framework\TestCase;
 
 class FieldsOptionsTest extends TestCase
 {
+    private array $data;
+    private FieldsOptions $options;
+
+    public function setUp(): void
+    {
+        $this->data = $this->getSampleData();
+        $this->options = new FieldsOptions($this->data);
+    }
+
     public function testConstruct()
     {
-        $data = $this->getSampleData();
-
-        $options = new FieldsOptions($data);
-        $this->assertTrue($options->isFieldIncluded('id'));
-        $this->assertFalse($options->isFieldIncluded('missing'));
+        $this->assertTrue($this->options->isFieldIncluded('id'));
+        $this->assertFalse($this->options->isFieldIncluded('missing'));
         // field is present but value is false
-        $this->assertFalse($options->isFieldIncluded('seo'));
-        $this->assertTrue($options->isFieldIncluded('profile'));
-        $this->assertTrue($options->isFieldIncluded('profile.education'));
+        $this->assertFalse($this->options->isFieldIncluded('seo'));
+        $this->assertTrue($this->options->isFieldIncluded('profile'));
+        $this->assertTrue($this->options->isFieldIncluded('profile.education'));
         $this->assertEquals(
-            $data['profile']['education']['_opt']['limit'],
-            $options->getFieldOption('profile.education', 'limit')
+            $this->data['profile']['education']['_opt']['limit'],
+            $this->options->getFieldOption('profile.education', 'limit')
         );
         $this->assertEquals(
             1,
-            $options->getFieldOption('profile.education', 'missing', 1)
+            $this->options->getFieldOption('profile.education', 'missing', 1)
         );
         $this->assertNull(
-            $options->getFieldOption('profile.education', 'missing')
+            $this->options->getFieldOption('profile.education', 'missing')
         );
 
-        $this->assertEquals($options->getFieldOptions('profile.education'), $data['profile']['education']['_opt']);
+        $this->assertEquals(
+            $this->options->getFieldOptions('profile.education'),
+            $this->data['profile']['education']['_opt']
+        );
     }
 
     public function testConstructWithInvalidData()
@@ -41,39 +50,42 @@ class FieldsOptionsTest extends TestCase
 
     public function testFieldGroups()
     {
-        $data = $this->getSampleData();
-        $options = new FieldsOptions($data);
-        $this->assertTrue($options->hasDefaultFields());
-        $this->assertFalse($options->hasDefaultFields('profile'));
-        $this->assertTrue($options->hasGroupField('_basicInfo'));
-        $this->assertFalse($options->hasAllFields('profile'));
-        $this->assertTrue($options->hasAllFields('profile.education'));
+        $this->assertTrue($this->options->hasDefaultFields());
+        $this->assertFalse($this->options->hasDefaultFields('profile'));
+        $this->assertFalse($this->options->hasDefaultFields('profile.workHistory'));
+        $this->assertTrue($this->options->hasGroupField('_basicInfo'));
+        $this->assertFalse($this->options->hasAllFields('profile'));
+        $this->assertTrue($this->options->hasAllFields('profile.education'));
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('not available');
-        $options->hasAllFields('profiles.missing');
+        $this->options->hasAllFields('profile.missing');
     }
 
     public function testMissingFieldGetOptionsThrowsException()
     {
-        $options = new FieldsOptions(['field' => true]);
         $this->expectException(\InvalidArgumentException::class);
-        $options->getFieldOptions('missing');
+        $this->options->getFieldOptions('missing');
     }
 
     public function testGetIncludedFields()
     {
-        $data = $this->getSampleData();
-        $options = new FieldsOptions($data);
-        $this->assertEquals(['_defaults', '_basicInfo', 'id', 'profile'], $options->getIncludedFields());
-        $this->assertEquals(['education'], $options->getIncludedFields('profile'));
+        $this->assertEquals(['_defaults', '_basicInfo', 'id', 'profile'], $this->options->getIncludedFields());
+        $this->assertEquals(['education', 'workHistory'], $this->options->getIncludedFields('profile'));
     }
 
     public function testToArray()
     {
-        $data = $this->getSampleData();
-        $options = new FieldsOptions($data);
-        $this->assertEquals($data, $options->toArray());
-        $this->assertEquals($data['profile']['education'], $options->toArray('profile.education'));
+        $this->assertEquals($this->data, $this->options->toArray());
+        $this->assertEquals($this->data['profile']['education'], $this->options->toArray('profile.education'));
+        $this->assertEquals([], $this->options->toArray('missing'));
+    }
+
+    public function testIsFieldSpecified()
+    {
+        $this->assertTrue($this->options->isFieldSpecified('id'));
+        $this->assertTrue($this->options->isFieldSpecified('profile.education'));
+        $this->assertFalse($this->options->isFieldSpecified('profile.education.missing'));
+        $this->assertFalse($this->options->isFieldSpecified('missing'));
     }
 
     private function getSampleData()
@@ -81,11 +93,11 @@ class FieldsOptionsTest extends TestCase
         return [
             '_defaults' => true,
             '_basicInfo' => true,
-            'id'       => true,
-            'seo'      => false,
-            'profile'  =>
+            'id'         => true,
+            'seo'        => false,
+            'profile'    =>
                 [
-                    'education' =>
+                    'education'   =>
                         [
                             '_all' => true,
                             '_opt' =>
@@ -95,6 +107,11 @@ class FieldsOptionsTest extends TestCase
                                     'sortDir' => 'asc',
                                 ],
                         ],
+                    'workHistory' =>
+                        [
+                            '_defaults' => false,
+                            'id'        => true
+                        ]
                 ],
         ];
     }

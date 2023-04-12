@@ -31,14 +31,38 @@ class FieldsOptions
      */
     public function toArray(string $fieldPath = null): array
     {
-        return ArrayHelper::getValue($this->data, $fieldPath);
+        return ArrayHelper::getValue($this->data, $fieldPath) ?? [];
     }
 
+    /**
+     * In addition to isFieldSpecified() this will also check if the field is set to `true`.
+     *
+     * @param string $fieldPath
+     * @return bool
+     */
     public function isFieldIncluded(string $fieldPath): bool
     {
         return ArrayHelper::getValue($this->data, $fieldPath, false) !== false;
     }
 
+    /**
+     * This is simply a way to determine if the field was specified or not on the options,
+     * either with `true` or `false`.
+     *
+     * @param string $fieldPath
+     * @return bool
+     */
+    public function isFieldSpecified(string $fieldPath): bool
+    {
+        return ArrayHelper::getValue($this->data, $fieldPath) !== null;
+    }
+
+    /**
+     * Return an array of options specified on the field path indexed by option name
+     *
+     * @param string $fieldPath
+     * @return array
+     */
     public function getFieldOptions(string $fieldPath): array
     {
         $this->assertFieldExists($fieldPath);
@@ -46,12 +70,31 @@ class FieldsOptions
         return ArrayHelper::getValue($this->data, $fieldPath . '.' . self::OPTIONS_KEY, []);
     }
 
+    /**
+     * Returns the option value for a field, a default value or null if the option was not provided
+     * If $default is provided and the option does not have a value, it will return the value in $default
+     *
+     * @param string $fieldPath
+     * @param string $option
+     * @param $default
+     * @return mixed|null
+     */
     public function getFieldOption(string $fieldPath, string $option, /*mixed*/ $default = null): ?string
     {
         $options = $this->getFieldOptions($fieldPath);
         return $options[$option] ?? $default;
     }
 
+    /**
+     * WIll check if the options contains the group by explicit inclusion
+     * Useful for the custom groups
+     *
+     * @see hasDefaultFields()
+     * @see hasAllFields()
+     *
+     * @param string|null $fieldPath
+     * @return bool true if _defaults is not specified or specified and is not false, false otherwise
+     */
     public function hasGroupField(string $group, ?string $fieldPath = null): bool
     {
         $path = $fieldPath ? ($fieldPath . '.' . $group) : $group;
@@ -65,16 +108,37 @@ class FieldsOptions
         return $this->isFieldIncluded($path);
     }
 
+    /**
+     * WIll check if the options contain the default fields either by implicit or explicit inclusion
+     *
+     * @param string|null $fieldPath
+     * @return bool true if _defaults is not specified or specified and is not false, false otherwise
+     */
     public function hasDefaultFields(?string $fieldPath = null): bool
     {
-        return $this->hasGroupField(self::FIELD_DEFAULTS, $fieldPath);
+        return $this->toArray($fieldPath) == [] || $this->hasGroupField(self::FIELD_DEFAULTS, $fieldPath);
     }
 
+    /**
+     * WIll check if the options contain all fields either by implicit or explicit inclusion
+     *
+     * @param string|null $fieldPath
+     * @return bool false if _all is not specified or specified and is not false, true otherwise
+     */
     public function hasAllFields(?string $fieldPath = null): bool
     {
         return $this->hasGroupField(self::FIELD_ALL, $fieldPath);
     }
 
+    /**
+     * Returns the list of actually explicitly included fields
+     * Does not know about defaults or groups. If a field is a default field it won't be returned here.
+     * This will probably change in future versions to also include the default fields or coming from group fields
+     * if they were included using the group
+     *
+     * @param string|null $fieldPath
+     * @return array
+     */
     public function getIncludedFields(?string $fieldPath = null): array
     {
         if ($fieldPath) {
@@ -104,7 +168,7 @@ class FieldsOptions
 
             if (is_array($datum)) {
                 static::validate($datum);
-            } else if (!is_bool($datum)) {
+            } elseif (!is_bool($datum)) {
                 throw new \RuntimeException('Invalid field options: ' . $key);
             }
         }
@@ -125,5 +189,16 @@ class FieldsOptions
         if (!$this->fieldExists($fieldPath)) {
             throw new \InvalidArgumentException(sprintf('Field "%s" is not available', $fieldPath));
         }
+    }
+
+    /**
+     * Returns an unique hash (md5) that for a set of fields options
+     * The hash will be the same for the same options
+     *
+     * @return string
+     */
+    public function getHash(): string
+    {
+        return md5(json_encode($this->data));
     }
 }

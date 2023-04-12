@@ -24,7 +24,6 @@ namespace Lucian\FieldsOptions\Test\Fixture;
  *
  * Do not define  public setters ! The magic __get automatically calls the setter.
  *
- *
  * ### Exporting to JSON
  *
  * The DTO should export to json because it implements JsonSerializable

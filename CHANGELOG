@@ -1,3 +1,10 @@
+### 1.4
+- added FieldsOptionsObjectApplier + tests
+- added validation in FieldsOptionsBuilder
+- added two new methods in FieldsOptionsBuilder: setGroupFieldExcluded
+- added two new method in FieldsOptions: isFieldSpecified, getHash. Improved phpdoc
+- improved unit tests to have more coverage
+
 ### 1.3
 
 - setFieldIncluded and setFieldExcluded can now include/exclude multiple fields from given path

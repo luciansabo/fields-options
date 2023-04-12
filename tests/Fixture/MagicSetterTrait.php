@@ -19,7 +19,7 @@ trait MagicSetterTrait
             throw new \LogicException(sprintf('Invalid property "%s"', $property));
         }
 
-        $method = 'set'. ucfirst($property);
+        $method = 'set' . ucfirst($property);
         if (method_exists($this, $method)) {
             call_user_func([$this, $method], $value);
             return $this;

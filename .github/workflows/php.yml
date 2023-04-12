@@ -59,6 +59,8 @@ jobs:
       uses: tinovyatkin/action-php-codesniffer@v1
       with:
         phpcs_path: vendor/bin/phpcs
+        files: "**.php"
+        standard: PSR12
 
     - name: Psalm Static Analysis
       run: ./vendor/bin/psalm

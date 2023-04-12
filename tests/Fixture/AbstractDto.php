@@ -38,6 +38,7 @@ namespace Lucian\FieldsOptions\Test\Fixture;
 abstract class AbstractDto implements \JsonSerializable, \IteratorAggregate
 {
     use MagicSetterTrait;
+
     protected ?array $__exportedProperties = null;
     protected array $__excludedProperties = [];
 
@@ -138,7 +139,8 @@ abstract class AbstractDto implements \JsonSerializable, \IteratorAggregate
         $exported = [];
 
         foreach ($properties as $name => $value) {
-            if ($this->propertyExists($name) &&
+            if (
+                $this->propertyExists($name) &&
                 (!$this->hasSetProperties() || !empty($this->__exportedProperties[$name])) &&
                 empty($this->__excludedProperties[$name])
             ) {

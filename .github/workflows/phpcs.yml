@@ -12,8 +12,8 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v3
-              #with:
-                  #fetch-depth: 0 # important!
+              with:
+                  fetch-depth: 2 # important!
 
             # we may use whatever way to install phpcs, just specify the path on the next step
             # however, curl seems to be the fastest

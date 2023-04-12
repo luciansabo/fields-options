@@ -74,7 +74,9 @@ There are two special groups: `_defaults` and `_all`.
 
 `_defaults` is assumed `true` for a field nested fields if you only specify the parent field, and you don't provide a list of nested fields.
 `_defaults` is implicit `true` only when you don't have a list of fields for root or for a sub-field.
-When you specify a list of fields, it is considered `false`, and you have to be explicit to include the default fields too. 
+When you specify a list of fields, it is considered `false`, and you have to be explicit to include the default fields too.
+
+The default fields logic should be embedded into the serialized object.
 
 In this case there is no list of fields, so we will assume you want to export the default fields from profile:
 
@@ -104,7 +106,7 @@ or with
 }
 ```
 
-Since, the root definition contains a list of fields (profile), then we will assume you don't want the default fields from the root
+Since, the root definition contains a list of fields (profile), then we will assume you don't want the default fields from the root,
 and you only want the `profile` object.
 
 But if you want the root defaults in addition to the profile, you can specify `_defaults` on the root:
@@ -145,13 +147,6 @@ which is equivalent to
 Since `_all` is `false` by default, there is no point in setting it to `false`.
 `_all` only makes sense if you want all fields, so use it with `_all: true`
 
-**Precedence rules:**
-- `_all` and `_defaults` are mutually exclusive
-- `_all` has precedence over `_defaults`
-
-The default fields logic should be embedded into the serialized object.
-There is no information about what fields are default or not for the fields options.
-
 As an example let's assume that the Profile DTO serializes by default only two fields: `id` and `name`.
 The fields `age` and `education` will only be exported if specifically requested or with `_all: true`.
 We also assume the root DTO exports all fields by default (both `id` and `profile`). 
@@ -174,6 +169,11 @@ This brings all fields from `profile`:
     }
 }
 ```
+
+#### Precedence rules for built-in groups
+
+- `_all` and `_defaults` are mutually exclusive
+- `_all` has precedence over `_defaults`
 
 #### Custom groups
 
@@ -329,7 +329,7 @@ Result:
 ## Using the library
 
 The `FieldsOptions` object encapsulates the provided options and can be constructor from an array (coming from a request)
-or using the `FieldsOptionsBuilder` if you want to configure them programatically.
+or using the `FieldsOptionsBuilder` if you want to configure them programmatically.
 
 It is up to the caller to honor these field options, but the library comes with a class called `FieldsOptionsObjectApplier`
 that can be used to recursively apply the options on an object such as a DTO and his nested properties, so that the object will serialize with only the desired fields.

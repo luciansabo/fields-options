@@ -2,10 +2,11 @@
 
 namespace Lucian\FieldsOptions\Test\Unit;
 
+use Lucian\FieldsOptions\FieldsOptions;
 use Lucian\FieldsOptions\FieldsOptionsBuilder;
-use Lucian\FieldsOptions\Test\Fixture\AbstractDto;
 use Lucian\FieldsOptions\Test\Fixture\LocationDto;
 use Lucian\FieldsOptions\Test\Fixture\ProfileDto;
+use Lucian\FieldsOptions\Validator;
 use PHPUnit\Framework\TestCase;
 
 class FieldsOptionsBuilderTest extends TestCase
@@ -16,7 +17,7 @@ class FieldsOptionsBuilderTest extends TestCase
     {
         $dto = new ProfileDto();
         $dto->location2 = new LocationDto();
-        $this->builder = new FieldsOptionsBuilder($dto);
+        $this->builder = new FieldsOptionsBuilder(new Validator($dto));
         parent::setUp();
     }
 
@@ -50,26 +51,67 @@ class FieldsOptionsBuilderTest extends TestCase
             ->setFieldIncluded(null);
     }
 
+    public function testBuildWithInitialValidData()
+    {
+        $initialData = [
+            'id' => true,
+            'education' => [
+                '_opt' => ['param1' => 1],
+                'institutionId' => true
+            ]
+        ];
+        $builder = new FieldsOptionsBuilder(new Validator(ProfileDto::getSampleDto()), $initialData);
+        $this->assertInstanceOf(FieldsOptionsBuilder::class, $builder);
+
+        $this->assertEquals($initialData, $builder->build()->toArray());
+        // add some options
+        $options = $builder
+            ->setFieldIncluded('location')
+            ->build();
+
+        $this->assertInstanceOf(FieldsOptions::class, $options);
+        $this->assertTrue($options->isFieldIncluded('location'));
+    }
+
+    public function testBuildWithInitialInvalidData()
+    {
+        $initialData = [
+            'id' => true,
+            'education' => [
+                '_opt' => ['param1' => 1],
+                'missing' => true
+            ]
+        ];
+        $this->expectExceptionMessage("Invalid field path 'education.missing'");
+        new FieldsOptionsBuilder(new Validator(ProfileDto::getSampleDto()), $initialData);
+    }
+
     /**
      * @dataProvider invalidFieldsProvider
      * @return void
      */
-    public function testSetInvalidFieldIncluded(?string $path, array $fields = [])
+    public function testSetInvalidFieldIncluded(?string $path, array $fields = [], ?string $invalidFieldPath = null)
     {
-        $this->expectExceptionMessage("Invalid field path");
+        $message = 'Invalid field path';
+        if ($invalidFieldPath) {
+            $message .= " '$invalidFieldPath'";
+        }
+        $this->expectExceptionMessage($message);
         $this->builder->setFieldIncluded($path, $fields);
     }
 
     public function invalidFieldsProvider(): array
     {
+        // sub-array structure:
+        // ?string $path, array $fields = [], ?string $invalidFieldPath = null
         return [
             ['missing'],
             ['location.missing'],
-            ['location2.missing'],
+            ['location2.missing', [], 'location2.missing'],
             //['__exportedProperties'],
-            ['dateCreated.missing'],
+            ['dateCreated.missing', [], 'dateCreated.missing'],
             [null, ['missing']],
-            ['location', ['cityId', 'missing']],
+            ['location', ['cityId', 'missing'], 'location.missing'],
         ];
     }
 
@@ -149,8 +191,8 @@ class FieldsOptionsBuilderTest extends TestCase
         $this->assertEquals($educationOptions, $fieldsOptions->getFieldOptions('education'));
         $this->assertEquals(['fullName' => 1], $fieldsOptions->getFieldOptions('workHistory.employerName'));
 
-        $this->expectExceptionMessage('Invalid field path');
-        $this->builder->setFieldOptions('location.missing', ['option1'], 1);
+        $this->expectExceptionMessage("Invalid field path 'location.missing'");
+        $this->builder->setFieldOptions('location.missing', ['option1' => 1]);
     }
 
 

@@ -2,47 +2,46 @@
 
 namespace Lucian\FieldsOptions\Test\Unit;
 
-use Lucian\FieldsOptions\ExportApplierInterface;
 use Lucian\FieldsOptions\FieldsOptions;
 use Lucian\FieldsOptions\FieldsOptionsObjectApplier;
 use Lucian\FieldsOptions\FieldsOptionsBuilder;
-use Lucian\FieldsOptions\Test\Fixture;
+use Lucian\FieldsOptions\Test\Fixture\ProfileDto;
 use Lucian\FieldsOptions\Test\Fixture\SampleExportApplier;
+use Lucian\FieldsOptions\Validator;
 use PHPUnit\Framework\TestCase;
 
 class FieldsOptionsObjectApplierTest extends TestCase
 {
     private FieldsOptionsObjectApplier $applier;
+    private FieldsOptionsBuilder $builder;
 
     public function setUp(): void
     {
         $this->applier = new FieldsOptionsObjectApplier(new SampleExportApplier());
+        $this->dto = $this->getSampleDto();
+        $this->builder = new FieldsOptionsBuilder(new Validator($this->dto));
         parent::setUp();
     }
 
     public function testApplyOneProperty()
     {
-        $dto = $this->getSampleDto();
-
-        $fieldsOptions = (new FieldsOptionsBuilder())
+        $fieldsOptions = $this->builder
             ->setFieldIncluded('id')
             ->build();
 
-        $this->applier->apply($dto, $fieldsOptions);
+        $this->applier->apply($this->dto, $fieldsOptions);
 
-        $this->assertEquals(['id' => 1], $dto->jsonSerialize());
+        $this->assertEquals(['id' => 1], $this->dto->jsonSerialize());
     }
 
     public function testApplyNestedProperty()
     {
-        $dto = $this->getSampleDto();
-
-        $fieldsOptions = (new FieldsOptionsBuilder())
+        $fieldsOptions = $this->builder
             ->setFieldIncluded('id')
             ->setFieldIncluded('education', ['institutionName'])
             ->build();
 
-        $this->applier->apply($dto, $fieldsOptions);
+        $this->applier->apply($this->dto, $fieldsOptions);
 
         $this->assertEquals(
             [
@@ -52,15 +51,13 @@ class FieldsOptionsObjectApplierTest extends TestCase
                     ['institutionName' => 'MIT']
                 ]
             ],
-            json_decode(json_encode($dto), true)
+            json_decode(json_encode($this->dto), true)
         );
     }
 
     public function testApplyNestedPropertyWithCache()
     {
-        $dto = $this->getSampleDto();
-
-        $fieldsOptions = (new FieldsOptionsBuilder())
+        $fieldsOptions = $this->builder
             ->setFieldIncluded('id')
             ->setFieldIncluded('education', ['institutionName'])
             ->setDefaultFieldsIncluded('workHistory')
@@ -68,16 +65,17 @@ class FieldsOptionsObjectApplierTest extends TestCase
             ->build();
 
         // apply to a nested object to test cache
-        $this->applier->apply($dto->education[0], new FieldsOptions($fieldsOptions->toArray('education')));
+        $this->applier->apply($this->dto->education[0], new FieldsOptions($fieldsOptions->toArray('education')));
 
         $this->assertEquals(
             ['institutionName' => 'Columbia'],
-            json_decode(json_encode($dto->education[0]), true)
+            json_decode(json_encode($this->dto->education[0]), true)
         );
 
         // test with a generator
+        $dto = $this->dto;
         $dto->workHistory = iterator_to_array($this->getWorkHistoryGenerator($dto));
-        $this->applier->apply($dto, $fieldsOptions);
+        $this->applier->apply($this->dto, $fieldsOptions);
 
         $this->assertEquals(
             [
@@ -91,16 +89,16 @@ class FieldsOptionsObjectApplierTest extends TestCase
                     ['id' => 2, 'startYear' => 2020],
                 ]
             ],
-            json_decode(json_encode($dto), true)
+            json_decode(json_encode($this->dto), true)
         );
     }
 
     public function testApplyAllFields()
     {
-        $sampleDto = $this->getSampleDto();
+        $sampleDto = $this->dto;
         $dto = clone $sampleDto;
 
-        $fieldsOptions = (new FieldsOptionsBuilder())
+        $fieldsOptions = $this->builder
             ->setAllFieldsIncluded()
             ->build();
 
@@ -115,9 +113,7 @@ class FieldsOptionsObjectApplierTest extends TestCase
 
     public function testApplyAllFieldsExceptOne()
     {
-        $dto = $this->getSampleDto();
-
-        $fieldsOptions = (new FieldsOptionsBuilder($dto))
+        $fieldsOptions = $this->builder
             ->setAllFieldsIncluded()
             ->setAllFieldsIncluded('education')
             ->setFieldExcluded('education', ['institutionName'])
@@ -127,7 +123,7 @@ class FieldsOptionsObjectApplierTest extends TestCase
             ->build();
 
         $this->applier->apply(
-            $dto,
+            $this->dto,
             $fieldsOptions
         );
 
@@ -146,17 +142,21 @@ class FieldsOptionsObjectApplierTest extends TestCase
                 ],
                 'dateCreated' => '2023-01-01 00:00:00',
                 'location'    => null,
-                'location2'   => null,
+                'location2'   => [
+                    'cityId' => 1,
+                    'countryId' => 2,
+                    'city' => 'Bucharest',
+                    'country' => 'Romania',
+                ],
+                '_text' => null
             ],
-            json_decode(json_encode($dto), true)
+            json_decode(json_encode($this->dto), true)
         );
     }
 
     public function testApplyNoDefaultsSpecified()
     {
-        $dto = $this->getSampleDto();
-
-        $fieldsOptions = (new FieldsOptionsBuilder($dto))
+        $fieldsOptions = $this->builder
             ->setAllFieldsIncluded()
             ->setAllFieldsIncluded('education')
             ->setFieldExcluded('education', ['institutionName'])
@@ -166,7 +166,7 @@ class FieldsOptionsObjectApplierTest extends TestCase
             ->build();
 
         $this->applier->apply(
-            $dto,
+            $this->dto,
             $fieldsOptions
         );
 
@@ -185,17 +185,21 @@ class FieldsOptionsObjectApplierTest extends TestCase
                 ],
                 'dateCreated' => '2023-01-01 00:00:00',
                 'location'    => null,
-                'location2'   => null,
+                'location2'   => [
+                    'cityId' => 1,
+                    'countryId' => 2,
+                    'city' => 'Bucharest',
+                    'country' => 'Romania',
+                ],
+                '_text' => null
             ],
-            json_decode(json_encode($dto), true)
+            json_decode(json_encode($this->dto), true)
         );
     }
 
     public function testApplyWithDefaults()
     {
-        $dto = $this->getSampleDto();
-
-        $fieldsOptions = (new FieldsOptionsBuilder($dto))
+        $fieldsOptions = $this->builder
             ->setDefaultFieldsIncluded()
             ->setFieldExcluded(null, ['name', 'education'])
             ->setDefaultFieldsIncluded('workHistory')
@@ -205,57 +209,20 @@ class FieldsOptionsObjectApplierTest extends TestCase
 
         // defaults mentioned
         $this->applier->apply(
-            $dto,
+            $this->dto,
             $fieldsOptions
         );
 
         $this->assertEquals(
             [
-                'id'          => $dto->id,
-                'workHistory' => json_decode(json_encode($dto->workHistory), true),
+                'id'          => $this->dto->id,
+                'workHistory' => json_decode(json_encode($this->dto->workHistory), true),
             ],
-            json_decode(json_encode($dto), true)
+            json_decode(json_encode($this->dto), true)
         );
     }
 
-    private function getSampleDto()
-    {
-        $dto = new Fixture\ProfileDto();
-        $dto->id = 1;
-        $dto->name = 'John';
-        $dto->description = 'test';
-        $dto->dateCreated = new \DateTimeImmutable('2023-01-01');
-
-        $dto->education = [];
-        $education = new Fixture\EducationDto();
-        $education->institutionId = 3;
-        $education->institutionName = 'Columbia';
-        $dto->education[] = $education;
-
-        $education = new Fixture\EducationDto();
-        $education->institutionId = 4;
-        $education->institutionName = 'MIT';
-        $dto->education[] = $education;
-
-        $dto->workHistory = [];
-        $workPlace = new Fixture\WorkplaceDto();
-        $workPlace->id = 1;
-        $workPlace->employerName = 'CNN';
-        $workPlace->startYear = 2019;
-        $workPlace->endYear = 2020;
-        $dto->workHistory[] = $workPlace;
-
-        $workPlace = new Fixture\WorkplaceDto();
-        $workPlace->id = 2;
-        $workPlace->employerName = 'BBC';
-        $workPlace->startYear = 2020;
-        $workPlace->endYear = 2021;
-        $dto->workHistory[] = $workPlace;
-
-        return $dto;
-    }
-
-    private function getWorkHistoryGenerator(Fixture\ProfileDto $dto)
+    private function getWorkHistoryGenerator(ProfileDto $dto): \Generator
     {
         $fieldsOptions = (new FieldsOptionsBuilder())
             ->setFieldIncluded(null, ['id', 'startYear'])
@@ -265,5 +232,10 @@ class FieldsOptionsObjectApplierTest extends TestCase
             $this->applier->apply($item, $fieldsOptions);
             yield $item;
         }
+    }
+
+    private function getSampleDto(): ProfileDto
+    {
+        return ProfileDto::getSampleDto();
     }
 }

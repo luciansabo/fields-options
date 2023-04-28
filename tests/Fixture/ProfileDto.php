@@ -27,6 +27,8 @@ class ProfileDto extends AbstractDto
 
     public ?\DateTimeImmutable $dateCreated = null;
 
+    public ?string $_text = null;
+
     /** needed to set protected location property */
     protected function setLocation(LocationDto $location)
     {
@@ -43,5 +45,49 @@ class ProfileDto extends AbstractDto
     protected function setLocation2(LocationDto $location)
     {
         $this->location2 = $location;
+    }
+
+    public static function getSampleDto(): self
+    {
+        $dto = new self();
+        $dto->id = 1;
+        $dto->name = 'John';
+        $dto->description = 'test';
+        $dto->dateCreated = new \DateTimeImmutable('2023-01-01');
+
+        $dto->education = [];
+        $education = new EducationDto();
+        $education->institutionId = 3;
+        $education->institutionName = 'Columbia';
+        $dto->education[] = $education;
+
+        $education = new EducationDto();
+        $education->institutionId = 4;
+        $education->institutionName = 'MIT';
+        $dto->education[] = $education;
+
+        $dto->workHistory = [];
+        $workPlace = new WorkplaceDto();
+        $workPlace->id = 1;
+        $workPlace->employerName = 'CNN';
+        $workPlace->startYear = 2019;
+        $workPlace->endYear = 2020;
+        $dto->workHistory[] = $workPlace;
+
+        $workPlace = new WorkplaceDto();
+        $workPlace->id = 2;
+        $workPlace->employerName = 'BBC';
+        $workPlace->startYear = 2020;
+        $workPlace->endYear = 2021;
+        $dto->workHistory[] = $workPlace;
+
+        $location = new LocationDto();
+        $location->cityId = 1;
+        $location->countryId = 2;
+        $location->city = 'Bucharest';
+        $location->country = 'Romania';
+        $dto->location2 = $location;
+
+        return $dto;
     }
 }

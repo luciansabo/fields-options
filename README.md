@@ -64,11 +64,12 @@ This is equivalent to not providing the `profile` field, because if you start pr
 ### Field groups
 
 Field groups can be useful to group certain fields and ask to return/not return them.
+The fields groups do not support any options, and they can only be `true` or `false`.
 
 There are two special groups: `_defaults` and `_all`.
 
 - If you want to indicate that the endpoint should return you the default fields or not use `_defauls` as field.   
-- If you want to indicate that the endpoint should return you all available fields or not use `_all` as field.   
+- If you want to indicate that the endpoint should return you all available fields or not use `_all` as field.
 
 #### _defaults group
 
@@ -178,7 +179,11 @@ This brings all fields from `profile`:
 #### Custom groups
 
 You can also declare your own field groups and put a custom logic behind them.
-It is recommended to prefix group names with underscore, as a convention.
+It is required to prefix group names with underscore, so they are detected.
+
+You can still have field names starting with underscore, but they will not support options, just boolean values.
+If possible, avoid fields names starting with underscore.
+
 
 ```json
 {
@@ -336,6 +341,11 @@ that can be used to recursively apply the options on an object such as a DTO and
 
 To specify a field path use the dot notation.
 
+The internal structure should never be specified manually. You should always use the `FieldsOptions` or `FieldsOptionsBuilder`
+classes.
+If you feel the need to manually build/alter the data array, then you are doing something wrong.
+The library tries to hide these details, so it can protect you against BC breaks and structure changes.
+
 Assuming this json structure was sent on the request:
 ```json
 {
@@ -370,9 +380,16 @@ In general, it is recommended to use the builder instead of manually creating th
 public function setFieldIncluded(?string $fieldPath, array $fields = []): self`
 ```
 
+You can optionally use a validator that receives a sample DTO.
+The validator will receive an object (preferred) or an array representing the schema of the response.
+
 ```php
+
 use Lucian\FieldsOptions\FieldsOptionsBuilder;
-$builder = new FieldsOptionsBuilder();
+use Lucian\FieldsOptions\Validator;
+
+$validator = new Validator($this->getSampleDto());
+$builder = new FieldsOptionsBuilder($validator);
 $fieldsOptions = $builder
     ->setFieldIncluded('id')
     ->setFieldExcluded('seo')
@@ -414,6 +431,14 @@ $fieldsOptions = $builder->setGroupFieldIncluded('_basicInfo', 'profile')
 $fieldsOptions->hasGroupField('_basicInfo', 'profile') // true
 ```
 
+You can also create a builder with initial data. One scenario would be to add options to existing fields options.
+
+```php
+$data = $fieldsOptions->toArray();
+$builder = new FieldsOptionsBuilder($validator, $data);
+$builder->setFieldIncluded('fancyField');
+```
+
 ### Using the FieldsOptions class
 
 ```php
@@ -453,7 +478,18 @@ Note the difference between `isFieldIncluded()` and `isFieldSpecified()`.
 
 #### Validation if fields
 
-If the builder is constructed with tbe prototype/schema, then including invalid fields will trigger a RuntimeException
+This library comes with a Validator implementation that should work with array and object prototypes: `Lucian\FieldsOptions\Validator`.
+
+You can provide the validator to both `FieldsOptions` and `FieldsOptionsBuilder`.
+A basic validator will be used in case it is not provider, that will only check the data structure.
+
+If the validator is constructed with tbe prototype/schema, then including invalid fields will trigger a RuntimeException.
+
+> **How validation works:** To validate fields, the prototype is analyzed using reflection.
+> All properties are considered valid fields. Typed properties have no issues, if they are scalar or classes.
+> For properties without type-hinting the validator tries to inspect the value.
+> If the value contains a collection, PHP does not have a Collection<T> type, and we cannot rely on phpdoc.
+> In that case, you have to populate the array with at least an object, and we assume they are all the same type.
 
 #### Testing field groups
 

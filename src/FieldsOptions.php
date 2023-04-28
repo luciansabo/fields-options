@@ -10,16 +10,19 @@ class FieldsOptions
     public const OPTIONS_KEY = '_opt';
     public const FIELD_DEFAULTS = '_defaults';
     public const FIELD_ALL = '_all';
-    private array $data = [];
+    private array $data;
 
     public const DEFAULT_GROUPS = [
         self::FIELD_DEFAULTS,
         self::FIELD_ALL
     ];
 
-    public function __construct(array $data = [])
+    public function __construct(array $data = [], ValidatorInterface $validator = null)
     {
-        static::validate($data);
+        if ($data) {
+            $validator ??= new Validator();
+            $validator->validateData($data);
+        }
         $this->data = $data;
     }
 
@@ -89,11 +92,12 @@ class FieldsOptions
      * WIll check if the options contains the group by explicit inclusion
      * Useful for the custom groups
      *
-     * @see hasDefaultFields()
-     * @see hasAllFields()
-     *
+     * @param string $group
      * @param string|null $fieldPath
      * @return bool true if _defaults is not specified or specified and is not false, false otherwise
+     * @see hasAllFields()
+     *
+     * @see hasDefaultFields()
      */
     public function hasGroupField(string $group, ?string $fieldPath = null): bool
     {
@@ -159,21 +163,6 @@ class FieldsOptions
         return $fields;
     }
 
-    private static function validate(array $data): void
-    {
-        foreach ($data as $key => $datum) {
-            if ($key == self::OPTIONS_KEY) {
-                continue;
-            }
-
-            if (is_array($datum)) {
-                static::validate($datum);
-            } elseif (!is_bool($datum)) {
-                throw new \RuntimeException('Invalid field options: ' . $key);
-            }
-        }
-    }
-
     private function fieldExists(string $fieldPath): bool
     {
         return ArrayHelper::getValue($this->data, $fieldPath, '-123qwerty') !== '-123qwerty';
@@ -192,7 +181,7 @@ class FieldsOptions
     }
 
     /**
-     * Returns an unique hash (md5) that for a set of fields options
+     * Returns a unique hash (md5) that for a set of fields options
      * The hash will be the same for the same options
      *
      * @return string

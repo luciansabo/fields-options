@@ -3,6 +3,7 @@
 namespace Lucian\FieldsOptions\Test\Unit;
 
 use Lucian\FieldsOptions\FieldsOptions;
+use Lucian\FieldsOptions\Validator;
 use PHPUnit\Framework\TestCase;
 
 class FieldsOptionsTest extends TestCase
@@ -13,7 +14,7 @@ class FieldsOptionsTest extends TestCase
     public function setUp(): void
     {
         $this->data = $this->getSampleData();
-        $this->options = new FieldsOptions($this->data);
+        $this->options = new FieldsOptions($this->data, new Validator());
     }
 
     public function testConstruct()
@@ -42,10 +43,32 @@ class FieldsOptionsTest extends TestCase
         );
     }
 
-    public function testConstructWithInvalidData()
+    public function testConstructWithoutValidator()
+    {
+        // this should work because we don't have a validator
+        $this->assertInstanceOf(FieldsOptions::class, new FieldsOptions(['id' => true, 'missing' => true]));
+        // this should not work because the class should instantiate a basic validator
+        $this->expectExceptionMessage('Invalid field options ');
+        $this->assertInstanceOf(FieldsOptions::class, new FieldsOptions(['id' => true, 'profile' => 'invalid']));
+    }
+
+    /**
+     * @dataProvider invalidDataProvider
+     * @param array $data
+     * @return void
+     */
+    public function testConstructWithInvalidData(array $data)
     {
         $this->expectException(\RuntimeException::class);
-        new FieldsOptions(['id' => true, 'profile' => 'invalid']);
+        new FieldsOptions($data, new Validator());
+    }
+
+    public function invalidDataProvider(): array
+    {
+        return [
+            [['id' => true, 'profile' => 'invalid']],
+            [['id' => true, 'profile' => ['nested' => 'invalid']]],
+        ];
     }
 
     public function testFieldGroups()
@@ -88,7 +111,7 @@ class FieldsOptionsTest extends TestCase
         $this->assertFalse($this->options->isFieldSpecified('missing'));
     }
 
-    private function getSampleData()
+    private function getSampleData(): array
     {
         return [
             '_defaults' => true,

@@ -19,6 +19,7 @@ class ArrayHelperTest extends TestCase
     /**
      * @dataProvider getTestCases
      * @param string $path
+     * @param $default
      * @param $expected
      * @return void
      */
@@ -27,7 +28,7 @@ class ArrayHelperTest extends TestCase
         $this->assertEquals($expected, ArrayHelper::getValue(self::SAMPLE, $path, $default));
     }
 
-    public function getTestCases()
+    public function getTestCases(): array
     {
         return [
             ['tests', null, 'testValue'],

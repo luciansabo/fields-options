@@ -22,5 +22,7 @@ class SampleExportApplier implements ExportApplierInterface
         if ($data instanceof AbstractDto) {
             return array_keys(iterator_to_array($data->getIterator()));
         }
+
+        return [];
     }
 }

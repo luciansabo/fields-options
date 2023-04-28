@@ -103,7 +103,7 @@ class FieldsOptionsObjectApplier
      *
      * @param object $object
      * @param FieldsOptions $fieldsOptions
-     * @return bool trye if we already applied to options, false otherwise
+     * @return bool true if we already applied to options, false otherwise
      */
     private function cacheObject(object $object, FieldsOptions $fieldsOptions): bool
     {

@@ -4,22 +4,23 @@ namespace Lucian\FieldsOptions;
 
 class FieldsOptionsBuilder
 {
-    private array $data = [];
-    /**
-     * @var array|object|null
-     */
-    private $prototype = null;
+    private array $data;
+
+    private ?ValidatorInterface $validator;
 
     /**
-     * @param object|array $prototype
+     * @param ValidatorInterface|null $validator
+     * @param array $data
      */
-    public function __construct($prototype = null)
+    public function __construct(ValidatorInterface $validator = null, array $data = [])
     {
-        // we can remove this in 8.1 with uniion types
-        if ($prototype && !is_array($prototype) && !is_object($prototype)) {
-            throw new \RuntimeException('$prototype must be either an array or an object');
+        if ($data) {
+            $validator ??= new Validator();
+            $validator->validateData($data);
         }
-        $this->prototype = $prototype;
+
+        $this->validator = $validator;
+        $this->data = $data;
     }
 
     /**
@@ -49,23 +50,6 @@ class FieldsOptionsBuilder
     public function setFieldExcluded(?string $fieldPath, array $fields = []): self
     {
         return $this->setFieldInclusion($fieldPath, $fields, false);
-    }
-
-    private function validateField(?string $fieldPath)
-    {
-        if (!$this->prototype || !$fieldPath) {
-            return;
-        }
-
-        if (is_array($this->prototype)) {
-            if (ArrayHelper::getValue($this->prototype, $fieldPath, false) === false) {
-                throw new \RuntimeException("Invalid field path '$fieldPath'");
-            }
-        } else {
-            if (!$this->objectPathExists($this->prototype, $fieldPath)) {
-                throw new \RuntimeException("Invalid field path '$fieldPath'");
-            }
-        }
     }
 
     private function setFieldInclusion(
@@ -148,60 +132,15 @@ class FieldsOptionsBuilder
         return $this;
     }
 
+    public function validateField(?string $fieldPath): void
+    {
+        if (isset($this->validator)) {
+            $this->validator->validateField($fieldPath);
+        }
+    }
+
     public function build(): FieldsOptions
     {
         return new FieldsOptions($this->data);
-    }
-
-    /**
-     * Rudimentary property exist check by dot notation
-     * Works with nested object not with iterables of objects
-     *
-     * @param object $object
-     * @param string $path
-     * @return bool
-     * @throws \ReflectionException
-     */
-    private function objectPathExists(object $object, string $path)
-    {
-        $pathComponents = explode('.', $path);
-        $objectReflection = new \ReflectionClass($object);
-
-        foreach ($pathComponents as $property) {
-            if (!$objectReflection->hasProperty($property)) {
-                return false;
-            }
-
-            $reflectionProperty = $objectReflection->getProperty($property);
-            // needed for php 7.4, not needed for 8.1
-            if (!$reflectionProperty->isPublic()) {
-                $reflectionProperty->setAccessible(true);
-            }
-            $type = $reflectionProperty->getType();
-
-            if ($type && $type->isBuiltin()) {
-                return true;
-            }
-
-            if ($type && $type instanceof \ReflectionNamedType && class_exists($type->getName())) {
-                $objectReflection = new \ReflectionClass($type->getName());
-            } elseif ($reflectionProperty->isInitialized($object)) {
-                // try to use value
-                $value = $reflectionProperty->getValue($object);
-                if (is_object($value)) {
-                    $objectReflection = new \ReflectionClass($value);
-                } elseif (is_array($value)) {
-                    $firstValue = reset($value);
-                    if (is_object($firstValue)) {
-                        $objectReflection = new \ReflectionClass($firstValue);
-                    }
-                }
-            } else {
-                // we cannot reliably determine types for uninitialized iterables
-                return true;
-            }
-        }
-
-        return true;
     }
 }

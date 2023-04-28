@@ -1,3 +1,9 @@
+### 1.5
+- validation fixes and improvements
+- extracted validator into a separate component
+- FieldsOptionsBuilder can receive the validator and initial data
+- FieldsOptions now receives the optional validator as argument
+
 ### 1.4
 - added FieldsOptionsObjectApplier + tests
 - added validation in FieldsOptionsBuilder

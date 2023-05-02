@@ -34,6 +34,51 @@ class FieldsOptionsObjectApplierTest extends TestCase
         $this->assertEquals(['id' => 1], $this->dto->jsonSerialize());
     }
 
+    public function testApplyEmptyFieldListGivesDefaults()
+    {
+        $fieldsOptions = $this->builder
+            ->setFieldIncluded('education', [])
+            ->build();
+
+        // take defaults before applier
+        $defaultFields = json_encode($this->dto->education);
+
+        $this->applier->apply($this->dto, $fieldsOptions);
+
+        $this->assertEquals(
+            json_encode(['education' => json_decode($defaultFields, true)]),
+            json_encode($this->dto)
+        );
+    }
+
+    public function testApplyDefaultsFalse()
+    {
+        $fieldsOptions = $this->builder
+            ->setGroupFieldExcluded('_defaults', 'education')
+            ->build();
+
+        $this->applier->apply($this->dto, $fieldsOptions);
+
+        $this->assertEquals(json_encode(['education' => [null, null]]), json_encode($this->dto));
+    }
+
+    public function testApplyAllFalseGivesDefaults()
+    {
+        $fieldsOptions = $this->builder
+            ->setGroupFieldExcluded('_all', 'education')
+            ->build();
+
+        // take defaults before applier
+        $defaultFields = json_encode($this->dto->education);
+
+        $this->applier->apply($this->dto, $fieldsOptions);
+
+        $this->assertEquals(
+            json_encode(['education' => json_decode($defaultFields, true)]),
+            json_encode($this->dto)
+        );
+    }
+
     public function testApplyNestedProperty()
     {
         $fieldsOptions = $this->builder

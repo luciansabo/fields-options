@@ -39,10 +39,16 @@ class FieldsOptionsObjectApplier
             // only all fields requested
             $this->applier->setExportedFields($object, null);
         } elseif (
-            empty($fieldsOptions->getIncludedFields()) ||
+            (empty($fieldsOptions->getIncludedFields()) && !$fieldsOptions->isFieldSpecified(FieldsOptions::FIELD_DEFAULTS)) ||
             $fieldsOptions->getIncludedFields() == [FieldsOptions::FIELD_DEFAULTS => true]
         ) {
             // only defaults requested
+            return;
+        } elseif (
+            $fieldsOptions->getIncludedFields() == [FieldsOptions::FIELD_DEFAULTS => false]
+        ) {
+            // nothing requested
+            $this->applier->setExportedFields($object, []);
             return;
         }
 

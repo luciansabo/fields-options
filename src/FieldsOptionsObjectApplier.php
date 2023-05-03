@@ -63,10 +63,14 @@ class FieldsOptionsObjectApplier
         $includedProperties = [];
         $supportedClass = $this->applier->getSupportedClass();
 
-        foreach ($reflection->getProperties() as $property) {
-            $field = $property->getName();
+        foreach ($reflection->getProperties() as $reflectionProperty) {
+            $field = $reflectionProperty->getName();
             if ($fieldsOptions->isFieldIncluded($field)) {
-                $propertyValue = $property->getValue($object);
+                // needed for php 7.4, not needed for 8.1
+                if (!$reflectionProperty->isPublic()) {
+                    $reflectionProperty->setAccessible(true);
+                }
+                $propertyValue = $reflectionProperty->getValue($object);
                 if (
                     is_object($propertyValue) &&
                     (!is_iterable($propertyValue) ||

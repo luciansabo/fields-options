@@ -1,3 +1,8 @@
+### 1.5.1
+- added ExportApplierInterface::getSupportedFields()
+- applier fixes and improved docs
+- added more tests to cover more cases
+
 ### 1.5
 - validation fixes and improvements
 - extracted validator into a separate component

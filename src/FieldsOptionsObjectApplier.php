@@ -39,7 +39,8 @@ class FieldsOptionsObjectApplier
             // only all fields requested
             $this->applier->setExportedFields($object, null);
         } elseif (
-            (empty($fieldsOptions->getIncludedFields()) && !$fieldsOptions->isFieldSpecified(FieldsOptions::FIELD_DEFAULTS)) ||
+            (empty($fieldsOptions->getIncludedFields()) &&
+                !$fieldsOptions->isFieldSpecified(FieldsOptions::FIELD_DEFAULTS)) ||
             $fieldsOptions->getIncludedFields() == [FieldsOptions::FIELD_DEFAULTS => true]
         ) {
             // only defaults requested
@@ -60,11 +61,17 @@ class FieldsOptionsObjectApplier
         $defaults = $hasDefaultFields ? $this->applier->getExportedFields($object) : [];
 
         $includedProperties = [];
+        $supportedClass = $this->applier->getSupportedClass();
+
         foreach ($reflection->getProperties() as $property) {
             $field = $property->getName();
             if ($fieldsOptions->isFieldIncluded($field)) {
                 $propertyValue = $property->getValue($object);
-                if (is_object($propertyValue) && !is_iterable($propertyValue)) {
+                if (
+                    is_object($propertyValue) &&
+                    (!is_iterable($propertyValue) ||
+                        ($supportedClass && is_subclass_of($propertyValue, $supportedClass)))
+                ) {
                     $this->apply(
                         $propertyValue,
                         new FieldsOptions($fieldsOptions->toArray($field))

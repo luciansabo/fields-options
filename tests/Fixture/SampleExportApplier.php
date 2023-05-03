@@ -25,4 +25,9 @@ class SampleExportApplier implements ExportApplierInterface
 
         return [];
     }
+
+    public function getSupportedClass(): string
+    {
+        return AbstractDto::class;
+    }
 }

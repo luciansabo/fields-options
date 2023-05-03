@@ -250,6 +250,7 @@ class FieldsOptionsObjectApplierTest extends TestCase
             ->setDefaultFieldsIncluded('workHistory')
             ->setFieldIncluded('workHistory', ['startYear'])
             ->setFieldExcluded('workHistory', ['employerName'])
+            ->setFieldIncluded(null, ['dateCreated', 'location2.cityId'])
             ->build();
 
         // defaults mentioned
@@ -262,6 +263,8 @@ class FieldsOptionsObjectApplierTest extends TestCase
             [
                 'id'          => $this->dto->id,
                 'workHistory' => json_decode(json_encode($this->dto->workHistory), true),
+                'dateCreated' => '2023-01-01 00:00:00',
+                'location2'   => ['cityId' => 1]
             ],
             json_decode(json_encode($this->dto), true)
         );

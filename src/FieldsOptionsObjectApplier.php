@@ -62,6 +62,9 @@ class FieldsOptionsObjectApplier
 
         $includedProperties = [];
         $supportedClass = $this->applier->getSupportedClass();
+        if (!class_exists($supportedClass)) {
+            $supportedClass = null;
+        }
 
         foreach ($reflection->getProperties() as $reflectionProperty) {
             $field = $reflectionProperty->getName();

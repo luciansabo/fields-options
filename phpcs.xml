@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <ruleset name="PHP_CodeSniffer">
     <rule ref="PSR12">
-        <exclude name="PSR12.Classes.PropertyDeclaration"/>
+        <exclude name="PSR2.Classes.PropertyDeclaration"/>
     </rule>
 </ruleset>

@@ -100,6 +100,7 @@ class FieldsOptionsTest extends TestCase
     {
         $this->assertEquals($this->data, $this->options->toArray());
         $this->assertEquals($this->data['profile']['education'], $this->options->toArray('profile.education'));
+        $this->assertEquals([], $this->options->toArray('seo'));
         $this->assertEquals([], $this->options->toArray('missing'));
     }
 

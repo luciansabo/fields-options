@@ -49,6 +49,10 @@ abstract class AbstractDto implements \JsonSerializable, \IteratorAggregate
     public function jsonSerialize()
     {
         $properties = iterator_to_array($this);
+        if (count($properties) == 0) {
+            return null;
+        }
+
         foreach ($properties as $name => $value) {
             if ($value instanceof \DateTimeInterface) {
                 $properties[$name] = $value->format('Y-m-d H:i:s');

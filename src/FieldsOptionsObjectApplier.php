@@ -39,10 +39,17 @@ class FieldsOptionsObjectApplier
             // only all fields requested
             $this->applier->setExportedFields($object, null);
         } elseif (
-            empty($fieldsOptions->getIncludedFields()) ||
+            (empty($fieldsOptions->getIncludedFields()) &&
+                !$fieldsOptions->isFieldSpecified(FieldsOptions::FIELD_DEFAULTS)) ||
             $fieldsOptions->getIncludedFields() == [FieldsOptions::FIELD_DEFAULTS => true]
         ) {
             // only defaults requested
+            return;
+        } elseif (
+            $fieldsOptions->getIncludedFields() == [FieldsOptions::FIELD_DEFAULTS => false]
+        ) {
+            // nothing requested
+            $this->applier->setExportedFields($object, []);
             return;
         }
 
@@ -54,11 +61,24 @@ class FieldsOptionsObjectApplier
         $defaults = $hasDefaultFields ? $this->applier->getExportedFields($object) : [];
 
         $includedProperties = [];
-        foreach ($reflection->getProperties() as $property) {
-            $field = $property->getName();
+        $supportedClass = $this->applier->getSupportedClass();
+        if (!class_exists($supportedClass)) {
+            $supportedClass = null;
+        }
+
+        foreach ($reflection->getProperties() as $reflectionProperty) {
+            $field = $reflectionProperty->getName();
             if ($fieldsOptions->isFieldIncluded($field)) {
-                $propertyValue = $property->getValue($object);
-                if (is_object($propertyValue) && !is_iterable($propertyValue)) {
+                // needed for php 7.4, not needed for 8.1
+                if (!$reflectionProperty->isPublic()) {
+                    $reflectionProperty->setAccessible(true);
+                }
+                $propertyValue = $reflectionProperty->getValue($object);
+                if (
+                    is_object($propertyValue) &&
+                    (!is_iterable($propertyValue) ||
+                        ($supportedClass && is_subclass_of($propertyValue, $supportedClass)))
+                ) {
                     $this->apply(
                         $propertyValue,
                         new FieldsOptions($fieldsOptions->toArray($field))

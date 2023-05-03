@@ -77,6 +77,7 @@ There are two special groups: `_defaults` and `_all`.
 `_defaults` is implicit `true` only when you don't have a list of fields for root or for a sub-field.
 When you specify a list of fields, it is considered `false`, and you have to be explicit to include the default fields too.
 
+
 The default fields logic should be embedded into the serialized object.
 
 In this case there is no list of fields, so we will assume you want to export the default fields from profile:
@@ -140,6 +141,52 @@ which is equivalent to
         "_defaults": false,
         "id": true
     }
+}
+```
+
+Specifying `_defaults: false` only makes sense with a list of non-default fields included.
+
+This is valid but not very useful, because without any additional fields in profile and with defaults disabled
+you will get null.
+
+```json
+{
+    "profile": {
+        "_defaults": false
+    }
+}
+```
+
+will get you after applying these:
+
+```json
+{
+    "profile": null
+}
+```
+
+
+These 3 examples are equivalent, and they all ask for the defaults in `profile`:
+
+```json
+{
+    "profile": {
+        "_defaults": true
+    }
+}
+```
+
+```json
+{
+    "profile": true
+}
+```
+
+Note how an empty object translates to _defaults: true:
+
+```json
+{
+    "profile": {}
 }
 ```
 
@@ -537,20 +584,62 @@ The approach in FieldsOptionsObjectApplier is to provide your DTO and your imple
 interface ExportApplierInterface
 {
     /**
+     * This is s used to mark the exported properties on the object.
+     * It is up to the object and/or whatever serialization method you have to actually only export those.
+     * The easiest way to do it is to implement the native PHP `JsonSerializable`interface and write the logic right
+     * inside the object.
+     *
      * @param object|array $data
-     * @param array $fields
+     * @param array|null $fields
      * @return object|array $data with exported fields
      */
-    public function setExportedFields(/*object|array*/ $data, ?array $fields);
+    public function setExportedFields(/*object|array*/ $data, ?array $fields): void;
 
+    /**
+     * Returns the properties exported by default on the object.
+     *
+     * @param object|array $data
+     * @return string[]
+     */
     public function getExportedFields(/*object|array*/ $data): array;
+
+    /**
+     * Should return the base class of your DTO
+     * This helps
+     *
+     * @return string
+     */
+    public function getSupportedClass(): string;
+}
+
+class SampleExportApplier implements ExportApplierInterface
+{
+    public function setExportedFields($data, ?array $fields): void
+    {
+        if ($data instanceof AbstractDto) {
+            // keep valid properties only
+            if ($fields) {
+                $fields = array_filter($fields, [$data, 'propertyExists']);
+            }
+            $data->setExportedProperties($fields);
+        }
+    }
+
+    public function getExportedFields($data): array
+    {
+        if ($data instanceof AbstractDto) {
+            return array_keys(iterator_to_array($data->getIterator()));
+        }
+
+        return [];
+    }
+
+    public function getSupportedClass(): string
+    {
+        return AbstractDto::class;
+    }
 }
 ```
-
-- `setExportedFields()` is used to mark the exported properties on the object. It is up to the object and/or whatever
-serialization method you have to actually only export those. The easiest way to do it is to implement the native PHP
-`JsonSerializable`interface and write the logic right inside the object.
-- `getExportedFields()` is used to get the properties exported by default on the object.
 
 
 #### Example

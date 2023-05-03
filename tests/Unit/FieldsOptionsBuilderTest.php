@@ -51,6 +51,14 @@ class FieldsOptionsBuilderTest extends TestCase
             ->setFieldIncluded(null);
     }
 
+    public function testSetFieldsIncludedWithEmptyFieldListAssumesDefault()
+    {
+        $fieldsOptions = $this->builder
+            ->setFieldIncluded('education', [])
+            ->build();
+        $this->assertEquals(['education' => true], $fieldsOptions->toArray());
+    }
+
     public function testBuildWithInitialValidData()
     {
         $initialData = [

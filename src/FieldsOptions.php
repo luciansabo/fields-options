@@ -34,7 +34,9 @@ class FieldsOptions
      */
     public function toArray(string $fieldPath = null): array
     {
-        return ArrayHelper::getValue($this->data, $fieldPath) ?? [];
+        $value = ArrayHelper::getValue($this->data, $fieldPath);
+
+        return is_array($value) ? $value : [];
     }
 
     /**

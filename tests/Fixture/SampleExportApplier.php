@@ -25,4 +25,13 @@ class SampleExportApplier implements ExportApplierInterface
 
         return [];
     }
+
+    /**
+     * @return string
+     * @psalm-return class-string
+     */
+    public function getSupportedClass(): string
+    {
+        return AbstractDto::class;
+    }
 }

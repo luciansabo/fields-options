@@ -380,7 +380,7 @@ Result:
 
 ## Using the library
 
-The `FieldsOptions` object encapsulates the provided options and can be constructor from an array (coming from a request)
+The `FieldsOptions` object encapsulates the provided options and can be constructed from an array (coming from a request)
 or using the `FieldsOptionsBuilder` if you want to configure them programmatically.
 
 It is up to the caller to honor these field options, but the library comes with a class called `FieldsOptionsObjectApplier`

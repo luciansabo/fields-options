@@ -1,3 +1,8 @@
+### 1.5.2
+- fixed hasDefaultFields behavior when _opt or _all are present
+- added more tests to cover more cases
+- added `composer test` command to run composer install, phpunit, psalm and phpcs
+
 ### 1.5.1
 - added ExportApplierInterface::getSupportedFields()
 - applier fixes and improved docs

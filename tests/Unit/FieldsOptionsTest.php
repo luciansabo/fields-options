@@ -19,12 +19,28 @@ class FieldsOptionsTest extends TestCase
 
     public function testConstruct()
     {
-        $this->assertTrue($this->options->isFieldIncluded('id'));
-        $this->assertFalse($this->options->isFieldIncluded('missing'));
-        // field is present but value is false
-        $this->assertFalse($this->options->isFieldIncluded('seo'));
-        $this->assertTrue($this->options->isFieldIncluded('profile'));
-        $this->assertTrue($this->options->isFieldIncluded('profile.education'));
+        $this->assertInstanceOf(FieldsOptions::class, $this->options);
+    }
+
+    public function testConstructWithoutValidator()
+    {
+        // this should work because we don't have a validator
+        $this->assertInstanceOf(FieldsOptions::class, new FieldsOptions(['id' => true, 'missing' => true]));
+        // this should not work because the class should instantiate a basic validator
+        $this->expectExceptionMessage('Invalid field options ');
+        $this->assertInstanceOf(FieldsOptions::class, new FieldsOptions(['id' => true, 'profile' => 'invalid']));
+    }
+
+    public function testGetFieldOptions()
+    {
+        $this->assertEquals(
+            $this->options->getFieldOptions('profile.education'),
+            $this->data['profile']['education']['_opt']
+        );
+    }
+
+    public function testGetFieldOption()
+    {
         $this->assertEquals(
             $this->data['profile']['education']['_opt']['limit'],
             $this->options->getFieldOption('profile.education', 'limit')
@@ -36,20 +52,20 @@ class FieldsOptionsTest extends TestCase
         $this->assertNull(
             $this->options->getFieldOption('profile.education', 'missing')
         );
-
-        $this->assertEquals(
-            $this->options->getFieldOptions('profile.education'),
-            $this->data['profile']['education']['_opt']
-        );
     }
 
-    public function testConstructWithoutValidator()
+    public function testIsFieldIncluded()
     {
-        // this should work because we don't have a validator
-        $this->assertInstanceOf(FieldsOptions::class, new FieldsOptions(['id' => true, 'missing' => true]));
-        // this should not work because the class should instantiate a basic validator
-        $this->expectExceptionMessage('Invalid field options ');
-        $this->assertInstanceOf(FieldsOptions::class, new FieldsOptions(['id' => true, 'profile' => 'invalid']));
+        $this->assertTrue($this->options->isFieldIncluded('id'));
+        $this->assertFalse($this->options->isFieldIncluded('missing'));
+        // field is present but value is false
+        $this->assertFalse($this->options->isFieldIncluded('seo'));
+        $this->assertTrue($this->options->isFieldIncluded('profile'));
+        $this->assertTrue($this->options->isFieldIncluded('profile.education'));
+        $this->assertTrue($this->options->isFieldIncluded('profile.skills.id'));
+        $this->assertFalse($this->options->isFieldIncluded('profile.skills.name'));
+        $this->assertTrue($this->options->isFieldIncluded('optionOnly'));
+        $this->assertTrue($this->options->isFieldIncluded('profile.location'));
     }
 
     /**
@@ -79,6 +95,13 @@ class FieldsOptionsTest extends TestCase
         $this->assertTrue($this->options->hasGroupField('_basicInfo'));
         $this->assertFalse($this->options->hasAllFields('profile'));
         $this->assertTrue($this->options->hasAllFields('profile.education'));
+        $this->assertFalse($this->options->hasDefaultFields('profile.education'));
+        $this->assertFalse($this->options->hasDefaultFields('profile.skills'));
+        $this->assertFalse($this->options->hasAllFields('profile.skills'));
+        $this->assertTrue($this->options->hasDefaultFields('optionOnly'));
+        $this->assertFalse($this->options->hasAllFields('optionOnly'));
+        $this->assertFalse($this->options->hasAllFields('profile.location'));
+        $this->assertTrue($this->options->hasDefaultFields('profile.location'));
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('not available');
         $this->options->hasAllFields('profile.missing');
@@ -92,8 +115,14 @@ class FieldsOptionsTest extends TestCase
 
     public function testGetIncludedFields()
     {
-        $this->assertEquals(['_defaults', '_basicInfo', 'id', 'profile'], $this->options->getIncludedFields());
-        $this->assertEquals(['education', 'workHistory'], $this->options->getIncludedFields('profile'));
+        $this->assertEquals(
+            ['_defaults', '_basicInfo', 'id', 'profile', 'optionOnly'],
+            $this->options->getIncludedFields()
+        );
+        $this->assertEquals(
+            ['education', 'workHistory', 'skills', 'location'],
+            $this->options->getIncludedFields('profile')
+        );
     }
 
     public function testToArray()
@@ -108,6 +137,8 @@ class FieldsOptionsTest extends TestCase
     {
         $this->assertTrue($this->options->isFieldSpecified('id'));
         $this->assertTrue($this->options->isFieldSpecified('profile.education'));
+        $this->assertTrue($this->options->isFieldSpecified('profile.skills.id'));
+        $this->assertfalse($this->options->isFieldSpecified('profile.skills.name'));
         $this->assertFalse($this->options->isFieldSpecified('profile.education.missing'));
         $this->assertFalse($this->options->isFieldSpecified('missing'));
     }
@@ -115,28 +146,31 @@ class FieldsOptionsTest extends TestCase
     private function getSampleData(): array
     {
         return [
-            '_defaults' => true,
+            '_defaults'  => true,
             '_basicInfo' => true,
             'id'         => true,
             'seo'        => false,
-            'profile'    =>
-                [
-                    'education'   =>
-                        [
-                            '_all' => true,
-                            '_opt' =>
-                                [
-                                    'limit'   => 1,
-                                    'sort'    => 'startYear',
-                                    'sortDir' => 'asc',
-                                ],
-                        ],
-                    'workHistory' =>
-                        [
-                            '_defaults' => false,
-                            'id'        => true
-                        ]
+            'profile'    => [
+                'education'   => [
+                    '_all' => true,
+                    '_opt' => [
+                        'limit'   => 1,
+                        'sort'    => 'startYear',
+                        'sortDir' => 'asc',
+                    ],
                 ],
+                'workHistory' => [
+                    '_defaults' => false,
+                    'id'        => true
+                ],
+                'skills' => [
+                    'id'        => true
+                ],
+                'location' => ['_all' => false]
+            ],
+            'optionOnly' => [
+                '_opt' => ['opt1' => 1]
+            ]
         ];
     }
 }

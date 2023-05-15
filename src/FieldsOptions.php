@@ -122,7 +122,17 @@ class FieldsOptions
      */
     public function hasDefaultFields(?string $fieldPath = null): bool
     {
-        return $this->toArray($fieldPath) == [] || $this->hasGroupField(self::FIELD_DEFAULTS, $fieldPath);
+        // the special _opt key or the _all field need to be removed to detect if we have fields or not
+        $fieldsArray = $this->toArray($fieldPath);
+        if (isset($fieldsArray[static::OPTIONS_KEY])) {
+            unset($fieldsArray[static::OPTIONS_KEY]);
+        }
+
+        if (isset($fieldsArray[static::FIELD_ALL]) && $fieldsArray[static::FIELD_ALL] === false) {
+            unset($fieldsArray[static::FIELD_ALL]);
+        }
+
+        return $this->hasGroupField(self::FIELD_DEFAULTS, $fieldPath) || $fieldsArray === [];
     }
 
     /**

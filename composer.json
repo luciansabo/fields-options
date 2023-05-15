@@ -21,6 +21,14 @@
             "Lucian\\FieldsOptions\\Test\\": "tests/"
         }
     },
+    "scripts": {
+        "test": [
+            "@composer install",
+            "phpunit",
+            "psalm",
+            "phpcs --standard=phpcs.xml src tests"
+        ]
+    },
     "authors": [
         {
             "name": "Lucian Sabo",

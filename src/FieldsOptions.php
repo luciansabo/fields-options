@@ -68,11 +68,14 @@ class FieldsOptions
      * @param string $fieldPath
      * @return array
      */
-    public function getFieldOptions(string $fieldPath): array
+    public function getFieldOptions(?string $fieldPath): array
     {
-        $this->assertFieldExists($fieldPath);
+        if ($fieldPath) {
+            $this->assertFieldExists($fieldPath);
+        }
+        $finalPath = $fieldPath ? ($fieldPath . '.' . FieldsOptions::OPTIONS_KEY) : FieldsOptions::OPTIONS_KEY;
 
-        return ArrayHelper::getValue($this->data, $fieldPath . '.' . self::OPTIONS_KEY, []);
+        return ArrayHelper::getValue($this->data, $finalPath, []);
     }
 
     /**
@@ -84,7 +87,7 @@ class FieldsOptions
      * @param $default
      * @return mixed|null
      */
-    public function getFieldOption(string $fieldPath, string $option, /*mixed*/ $default = null): ?string
+    public function getFieldOption(?string $fieldPath, string $option, /*mixed*/ $default = null): ?string
     {
         $options = $this->getFieldOptions($fieldPath);
         return $options[$option] ?? $default;

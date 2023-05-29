@@ -1,3 +1,7 @@
+### 1.5.3
+- fixed setFieldOptions overwrites fields , added tests
+- added support for options in setFieldOptions, setFieldOption, getFieldOptions, getFieldOption
+
 ### 1.5.2
 - fixed hasDefaultFields behavior when _opt or _all are present
 - added more tests to cover more cases

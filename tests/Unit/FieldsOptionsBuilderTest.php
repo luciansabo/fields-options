@@ -188,6 +188,21 @@ class FieldsOptionsBuilderTest extends TestCase
         $this->builder->setFieldOption('location.missing', 'option1', 1);
     }
 
+    public function testSetFieldOptionDoesNotOverwriteFields()
+    {
+        $fieldsOptions = $this->builder
+            ->setFieldIncluded('id')
+            ->setFieldIncluded('location.cityId')
+            ->setFieldOption(null, 'rootOpt', 1)
+            ->setFieldOption('location', 'withName', 1)
+            ->build();
+
+        $this->assertEquals(1, $fieldsOptions->getFieldOption(null, 'rootOpt'));
+        $this->assertEquals(1, $fieldsOptions->getFieldOption('location', 'withName'));
+        $this->assertTrue($fieldsOptions->isFieldIncluded('id'));
+        $this->assertTrue($fieldsOptions->isFieldIncluded('location.cityId'));
+    }
+
     public function testSetFieldOptions()
     {
         $educationOptions = ['limit' => 2, 'offset' => 5];
@@ -201,6 +216,21 @@ class FieldsOptionsBuilderTest extends TestCase
 
         $this->expectExceptionMessage("Invalid field path 'location.missing'");
         $this->builder->setFieldOptions('location.missing', ['option1' => 1]);
+    }
+
+    public function testSetFieldOptionsDoesNotOverwriteFields()
+    {
+        $educationOptions = ['limit' => 2, 'offset' => 5];
+        $rootOptions = ['rootOpt' => 1 ];
+        $fieldsOptions = $this->builder
+            ->setFieldIncluded('education.institutionId')
+            ->setFieldOptions('education', $educationOptions)
+            ->setFieldOptions(null, $rootOptions)
+            ->build();
+
+        $this->assertEquals($educationOptions, $fieldsOptions->getFieldOptions('education'));
+        $this->assertEquals($rootOptions, $fieldsOptions->getFieldOptions(null));
+        $this->assertTrue($fieldsOptions->isFieldIncluded('education.institutionId'));
     }
 
 

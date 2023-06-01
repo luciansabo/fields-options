@@ -82,21 +82,29 @@ class FieldsOptionsBuilder
         return $this;
     }
 
-    public function setFieldOption(string $fieldPath, string $option, /*mixed*/ $value): self
+    public function setFieldOption(?string $fieldPath, string $option, /*mixed*/ $value): self
     {
-        $this->validateField($fieldPath);
-        ArrayHelper::setValue($this->data, $fieldPath . '.' . FieldsOptions::OPTIONS_KEY . '.' . $option, $value);
+        if ($fieldPath) {
+            $this->validateField($fieldPath);
+        }
+        $finalPath = $fieldPath ? ($fieldPath . '.' . FieldsOptions::OPTIONS_KEY) : FieldsOptions::OPTIONS_KEY;
+        ArrayHelper::setValue($this->data, $finalPath . '.' . $option, $value);
 
         return $this;
     }
 
-    public function setFieldOptions(string $fieldPath, array $options): self
+    public function setFieldOptions(?string $fieldPath, array $options): self
     {
-        $this->validateField($fieldPath);
+        if ($fieldPath) {
+            $this->validateField($fieldPath);
+        }
+
+        $finalPath = $fieldPath ? ($fieldPath . '.' . FieldsOptions::OPTIONS_KEY) : FieldsOptions::OPTIONS_KEY;
+
         ArrayHelper::setValue(
             $this->data,
-            $fieldPath,
-            [FieldsOptions::OPTIONS_KEY => $options]
+            $finalPath,
+            $options
         );
 
         return $this;

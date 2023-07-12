@@ -87,7 +87,7 @@ class FieldsOptions
      * @param $default
      * @return mixed|null
      */
-    public function getFieldOption(?string $fieldPath, string $option, /*mixed*/ $default = null): ?string
+    public function getFieldOption(?string $fieldPath, string $option, /*mixed*/ $default = null)
     {
         $options = $this->getFieldOptions($fieldPath);
         return $options[$option] ?? $default;

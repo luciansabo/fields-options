@@ -35,7 +35,7 @@ jobs:
         args: --coverage-text
         configuration: phpunit.xml
         php_version: 8.3
-        version: 9.6
+        version: 12
 
     - name: PHPUnit Tests - 8.4
       uses: php-actions/phpunit@v3
@@ -44,7 +44,7 @@ jobs:
         args: --coverage-text
         configuration: phpunit.xml
         php_version: 8.4
-        version: 9.6
+        version: 12
 
     - name: PHPUnit Tests - 8.5
       uses: php-actions/phpunit@v3
@@ -53,7 +53,7 @@ jobs:
         args: --coverage-text
         configuration: phpunit.xml
         php_version: 8.5
-        version: 9.6
+        version: 12
 
     - name: Psalm Static Analysis
       run: ./vendor/bin/psalm

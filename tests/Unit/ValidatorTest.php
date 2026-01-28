@@ -5,6 +5,7 @@ namespace Lucian\FieldsOptions\Test\Unit;
 use Lucian\FieldsOptions\Test\Fixture\ProfileDto;
 use Lucian\FieldsOptions\Validator;
 use Lucian\FieldsOptions\ValidatorInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class ValidatorTest extends TestCase
@@ -16,49 +17,35 @@ class ValidatorTest extends TestCase
         parent::setUp();
     }
 
-    /**
-     * @dataProvider invalidFieldsProvider
-     * @return void
-     */
+    #[DataProvider('invalidFieldsProvider')]
     public function testValidateInvalidField(string $field)
     {
         $this->expectExceptionMessage("Invalid field path '$field");
         $this->validator->validateField($field);
     }
 
-    /**
-     * @dataProvider validFieldsProvider
-     * @doesNotPerformAssertions
-     * @return void
-     */
+    #[DataProvider('validFieldsProvider')]
     public function testValidateValidField(string $field)
     {
+        $this->expectNotToPerformAssertions();
         $this->validator->validateField($field);
     }
 
-    /**
-     * @dataProvider validDataProvider
-     * @doesNotPerformAssertions
-     * @param $data
-     * @return void
-     */
+    #[DataProvider('validDataProvider')]
     public function testValidateValidData($data)
     {
+        $this->expectNotToPerformAssertions();
         $this->validator->validateData($data);
     }
 
-    /**
-     * @dataProvider invalidDataProvider
-     * @param $data
-     * @return void
-     */
+    #[DataProvider('invalidDataProvider')]
     public function testValidateInvalidData($data)
     {
         $this->expectException(\RuntimeException::class);
         $this->validator->validateData($data);
     }
 
-    public function invalidFieldsProvider(): array
+    public static function invalidFieldsProvider(): array
     {
         return [
             ['missing'],
@@ -73,7 +60,7 @@ class ValidatorTest extends TestCase
         ];
     }
 
-    public function validFieldsProvider(): array
+    public static function validFieldsProvider(): array
     {
         return [
             ['id'],
@@ -87,7 +74,7 @@ class ValidatorTest extends TestCase
         ];
     }
 
-    public function validDataProvider(): array
+    public static function validDataProvider(): array
     {
         return [
             [[]],
@@ -101,7 +88,7 @@ class ValidatorTest extends TestCase
         ];
     }
 
-    public function invalidDataProvider(): array
+    public static function invalidDataProvider(): array
     {
         return [
             [['id' => 'invalid']],

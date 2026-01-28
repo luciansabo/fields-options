@@ -4,6 +4,7 @@ namespace Lucian\FieldsOptions\Test\Unit;
 
 use Lucian\FieldsOptions\FieldsOptions;
 use Lucian\FieldsOptions\Validator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class FieldsOptionsTest extends TestCase
@@ -68,18 +69,14 @@ class FieldsOptionsTest extends TestCase
         $this->assertTrue($this->options->isFieldIncluded('profile.location'));
     }
 
-    /**
-     * @dataProvider invalidDataProvider
-     * @param array $data
-     * @return void
-     */
+    #[DataProvider('invalidDataProvider')]
     public function testConstructWithInvalidData(array $data)
     {
         $this->expectException(\RuntimeException::class);
         new FieldsOptions($data, new Validator());
     }
 
-    public function invalidDataProvider(): array
+    public static function invalidDataProvider(): array
     {
         return [
             [['id' => true, 'profile' => 'invalid']],

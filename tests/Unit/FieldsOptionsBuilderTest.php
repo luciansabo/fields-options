@@ -7,6 +7,7 @@ use Lucian\FieldsOptions\FieldsOptionsBuilder;
 use Lucian\FieldsOptions\Test\Fixture\LocationDto;
 use Lucian\FieldsOptions\Test\Fixture\ProfileDto;
 use Lucian\FieldsOptions\Validator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class FieldsOptionsBuilderTest extends TestCase
@@ -94,10 +95,7 @@ class FieldsOptionsBuilderTest extends TestCase
         new FieldsOptionsBuilder(new Validator(ProfileDto::getSampleDto()), $initialData);
     }
 
-    /**
-     * @dataProvider invalidFieldsProvider
-     * @return void
-     */
+    #[DataProvider('invalidFieldsProvider')]
     public function testSetInvalidFieldIncluded(?string $path, array $fields = [], ?string $invalidFieldPath = null)
     {
         $message = 'Invalid field path';
@@ -108,7 +106,7 @@ class FieldsOptionsBuilderTest extends TestCase
         $this->builder->setFieldIncluded($path, $fields);
     }
 
-    public function invalidFieldsProvider(): array
+    public static function invalidFieldsProvider(): array
     {
         // sub-array structure:
         // ?string $path, array $fields = [], ?string $invalidFieldPath = null

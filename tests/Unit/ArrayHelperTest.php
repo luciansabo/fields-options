@@ -3,6 +3,7 @@
 namespace Lucian\FieldsOptions\Test\Unit;
 
 use Lucian\FieldsOptions\ArrayHelper;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class ArrayHelperTest extends TestCase
@@ -16,19 +17,13 @@ class ArrayHelperTest extends TestCase
         ]
     ];
 
-    /**
-     * @dataProvider getTestCases
-     * @param string $path
-     * @param $default
-     * @param $expected
-     * @return void
-     */
+    #[DataProvider('getTestCases')]
     public function testGetValue(string $path, $default, $expected)
     {
         $this->assertEquals($expected, ArrayHelper::getValue(self::SAMPLE, $path, $default));
     }
 
-    public function getTestCases(): array
+    public static function getTestCases(): array
     {
         return [
             ['tests', null, 'testValue'],

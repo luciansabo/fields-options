@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v6
 
     - name: Cache Composer dependencies
       uses: actions/cache@v3
@@ -25,35 +25,32 @@ jobs:
       with:
         dev: yes
         args: --profile --ignore-platform-reqs
-        php_version: 8.0
+        php_version: 8.3
         version: 2
 
-    - name: PHPUnit Tests - 7.4
+    - name: PHPUnit Tests - 8.3
       uses: php-actions/phpunit@v3
       with:
         bootstrap: vendor/autoload.php
-        args: --coverage-text
         configuration: phpunit.xml
-        php_version: 7.4
-        version: 9.6
+        php_version: 8.3
+        version: 12
 
-    - name: PHPUnit Tests - 8.1
+    - name: PHPUnit Tests - 8.4
       uses: php-actions/phpunit@v3
       with:
-          bootstrap: vendor/autoload.php
-          args: --coverage-text
-          configuration: phpunit.xml
-          php_version: 8.1
-          version: 9.6
+        bootstrap: vendor/autoload.php
+        configuration: phpunit.xml
+        php_version: 8.4
+        version: 12
 
-    - name: PHPUnit Tests - 8.2
+    - name: PHPUnit Tests - 8.5
       uses: php-actions/phpunit@v3
       with:
-          bootstrap: vendor/autoload.php
-          args: --coverage-text
-          configuration: phpunit.xml
-          php_version: 8.2
-          version: 9.6
+        bootstrap: vendor/autoload.php
+        configuration: phpunit.xml
+        php_version: 8.5
+        version: 12
 
     - name: Psalm Static Analysis
-      run: ./vendor/bin/psalm
+      uses: docker://ghcr.io/psalm/psalm-github-actions

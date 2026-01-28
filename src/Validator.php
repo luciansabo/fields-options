@@ -9,17 +9,13 @@ class Validator implements ValidatorInterface
      */
     private $prototype;
 
-    public function __construct($prototype = null)
+    public function __construct(array|object|null $prototype = null)
     {
-        // we can remove this in 8.1 with union types
-        if ($prototype && !is_array($prototype) && !is_object($prototype)) {
-            throw new \RuntimeException('$prototype must be either an array or an object');
-        }
-
         $this->prototype = $prototype;
     }
 
-    public function validateData(array $data, string $keyPath = null): void
+    #[\Override]
+    public function validateData(array $data, ?string $keyPath = null): void
     {
         foreach ($data as $key => $datum) {
             if ($key == FieldsOptions::OPTIONS_KEY) {
@@ -31,20 +27,22 @@ class Validator implements ValidatorInterface
                 continue;
             }
 
-            $fieldPath = $keyPath ? "$keyPath.$key" : $key;
+            $fieldPath = $keyPath !== null ? "$keyPath.$key" : $key;
             $this->validateField($fieldPath);
 
             if (is_array($datum)) {
                 $this->validateData($datum, $fieldPath);
             } elseif (!is_bool($datum)) {
-                throw new \RuntimeException('Invalid field options ' . $keyPath);
+                $errorPath = $keyPath ?? '';
+                throw new \RuntimeException('Invalid field options ' . $errorPath);
             }
         }
     }
 
+    #[\Override]
     public function validateField(?string $fieldPath): void
     {
-        if (!$this->prototype || !$fieldPath) {
+        if ($this->prototype === null || $fieldPath === null) {
             return;
         }
 
@@ -79,10 +77,6 @@ class Validator implements ValidatorInterface
             }
 
             $reflectionProperty = $objectReflection->getProperty($property);
-            // needed for php 7.4, not needed for 8.1
-            if (!$reflectionProperty->isPublic()) {
-                $reflectionProperty->setAccessible(true);
-            }
             $type = $reflectionProperty->getType();
 
             if ($type instanceof \ReflectionNamedType && class_exists($type->getName())) {

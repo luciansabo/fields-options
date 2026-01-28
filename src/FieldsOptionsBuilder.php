@@ -11,8 +11,9 @@ class FieldsOptionsBuilder
     /**
      * @param ValidatorInterface|null $validator
      * @param array $data
+     * @psalm-suppress PossiblyUnusedMethod
      */
-    public function __construct(ValidatorInterface $validator = null, array $data = [])
+    public function __construct(?ValidatorInterface $validator = null, array $data = [])
     {
         if ($data) {
             $validator ??= new Validator();
@@ -31,8 +32,8 @@ class FieldsOptionsBuilder
      * @return $this
      * @psalm-suppress LessSpecificReturnStatement
      * @psalm-suppress MoreSpecificReturnType
+     * @psalm-suppress PossiblyUnusedMethod
      */
-
     public function setFieldIncluded(?string $fieldPath, array $fields = []): self
     {
         return $this->setFieldInclusion($fieldPath, $fields, true);
@@ -46,6 +47,7 @@ class FieldsOptionsBuilder
      * @return $this
      * @psalm-suppress LessSpecificReturnStatement
      * @psalm-suppress MoreSpecificReturnType
+     * @psalm-suppress PossiblyUnusedMethod
      */
     public function setFieldExcluded(?string $fieldPath, array $fields = []): self
     {
@@ -58,7 +60,7 @@ class FieldsOptionsBuilder
         bool $isIncluded,
         bool $validateField = true
     ): self {
-        if (empty($fieldPath) && empty($fields)) {
+        if (($fieldPath === null || $fieldPath === '') && empty($fields)) {
             throw new \LogicException('No fields provided');
         }
 
@@ -69,7 +71,7 @@ class FieldsOptionsBuilder
 
             ArrayHelper::setValue($this->data, $fieldPath, $isIncluded);
         } else {
-            $basePath = $fieldPath ? "$fieldPath." : $fieldPath;
+            $basePath = $fieldPath !== null ? "$fieldPath." : $fieldPath;
 
             foreach ($fields as $field) {
                 if ($validateField) {
@@ -82,24 +84,30 @@ class FieldsOptionsBuilder
         return $this;
     }
 
-    public function setFieldOption(?string $fieldPath, string $option, /*mixed*/ $value): self
+    /**
+     * @psalm-suppress PossiblyUnusedMethod
+     */
+    public function setFieldOption(?string $fieldPath, string $option, mixed $value): self
     {
-        if ($fieldPath) {
+        if ($fieldPath !== null) {
             $this->validateField($fieldPath);
         }
-        $finalPath = $fieldPath ? ($fieldPath . '.' . FieldsOptions::OPTIONS_KEY) : FieldsOptions::OPTIONS_KEY;
+        $finalPath = $fieldPath !== null ? ($fieldPath . '.' . FieldsOptions::OPTIONS_KEY) : FieldsOptions::OPTIONS_KEY;
         ArrayHelper::setValue($this->data, $finalPath . '.' . $option, $value);
 
         return $this;
     }
 
+    /**
+     * @psalm-suppress PossiblyUnusedMethod
+     */
     public function setFieldOptions(?string $fieldPath, array $options): self
     {
-        if ($fieldPath) {
+        if ($fieldPath !== null) {
             $this->validateField($fieldPath);
         }
 
-        $finalPath = $fieldPath ? ($fieldPath . '.' . FieldsOptions::OPTIONS_KEY) : FieldsOptions::OPTIONS_KEY;
+        $finalPath = $fieldPath !== null ? ($fieldPath . '.' . FieldsOptions::OPTIONS_KEY) : FieldsOptions::OPTIONS_KEY;
 
         ArrayHelper::setValue(
             $this->data,
@@ -118,6 +126,9 @@ class FieldsOptionsBuilder
         return $this;
     }
 
+    /**
+     * @psalm-suppress PossiblyUnusedMethod
+     */
     public function setGroupFieldExcluded(string $groupField, ?string $fieldPath = null): self
     {
         $this->validateField($fieldPath);
@@ -126,6 +137,9 @@ class FieldsOptionsBuilder
         return $this;
     }
 
+    /**
+     * @psalm-suppress PossiblyUnusedMethod
+     */
     public function setDefaultFieldsIncluded(?string $fieldPath = null): self
     {
         $this->setGroupFieldIncluded(FieldsOptions::FIELD_DEFAULTS, $fieldPath);
@@ -133,6 +147,9 @@ class FieldsOptionsBuilder
         return $this;
     }
 
+    /**
+     * @psalm-suppress PossiblyUnusedMethod
+     */
     public function setAllFieldsIncluded(?string $fieldPath = null): self
     {
         $this->setGroupFieldIncluded(FieldsOptions::FIELD_ALL, $fieldPath);
@@ -147,6 +164,9 @@ class FieldsOptionsBuilder
         }
     }
 
+    /**
+     * @psalm-suppress PossiblyUnusedMethod
+     */
     public function build(): FieldsOptions
     {
         return new FieldsOptions($this->data);

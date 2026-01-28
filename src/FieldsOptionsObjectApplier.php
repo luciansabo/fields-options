@@ -2,10 +2,12 @@
 
 namespace Lucian\FieldsOptions;
 
+/**
+ * @psalm-suppress UnusedClass
+ */
 class FieldsOptionsObjectApplier
 {
     protected const MAX_REFLECTION_CACHE_SIZE = 100; // reflection cache
-    protected const MAX_APPLY_CACHE_SIZE = 1000;
 
     private ExportApplierInterface $applier;
 
@@ -17,15 +19,17 @@ class FieldsOptionsObjectApplier
     private array $reflectionCache = [];
 
     /**
-     * Stores a map between unique object hash and the last fields options unique hash
-     * Limited by MAX_APPLY_CACHE_SIZE
-     * @var array
+     * Stores a map between object instances and the last fields options unique hash
+     * Uses WeakMap to ensure proper object identity tracking and automatic cleanup
+     * when objects are garbage collected
+     * @var \WeakMap
      */
-    private array $applyCache = [];
+    private \WeakMap $applyCache;
 
     public function __construct(ExportApplierInterface $applier)
     {
         $this->applier = $applier;
+        $this->applyCache = new \WeakMap();
     }
 
     public function apply(object $object, FieldsOptions $fieldsOptions): void
@@ -69,10 +73,6 @@ class FieldsOptionsObjectApplier
         foreach ($reflection->getProperties() as $reflectionProperty) {
             $field = $reflectionProperty->getName();
             if ($fieldsOptions->isFieldIncluded($field)) {
-                // needed for php 7.4, not needed for 8.1
-                if (!$reflectionProperty->isPublic()) {
-                    $reflectionProperty->setAccessible(true);
-                }
                 $propertyValue = $reflectionProperty->getValue($object);
                 if (
                     is_object($propertyValue) &&
@@ -120,6 +120,7 @@ class FieldsOptionsObjectApplier
 
     /**
      * Keeps track if we applied the specific options to this object or not
+     * Uses WeakMap for proper object identity tracking without hash collision issues
      *
      * @param object $object
      * @param FieldsOptions $fieldsOptions
@@ -127,24 +128,16 @@ class FieldsOptionsObjectApplier
      */
     private function cacheObject(object $object, FieldsOptions $fieldsOptions): bool
     {
-        $objectHash = spl_object_hash($object);
-        if (isset($this->applyCache[$objectHash]) && $this->applyCache[$objectHash] == $fieldsOptions->getHash()) {
+        if (isset($this->applyCache[$object]) && $this->applyCache[$object] == $fieldsOptions->getHash()) {
             return true;
         }
 
-        // capped memory cache
-        if (count($this->applyCache) > static::MAX_APPLY_CACHE_SIZE) {
-            reset($this->applyCache);
-            $key = key($this->applyCache);
-            unset($this->applyCache[$key]);
-        }
-
-        $this->applyCache[$objectHash] = $fieldsOptions->getHash();
+        $this->applyCache[$object] = $fieldsOptions->getHash();
 
         return false;
     }
 
-    private function getReflection(object $object)
+    private function getReflection(object $object): \ReflectionClass
     {
         $objectClass = get_class($object);
 
@@ -156,7 +149,9 @@ class FieldsOptionsObjectApplier
         if (count($this->reflectionCache) > self::MAX_REFLECTION_CACHE_SIZE) {
             reset($this->reflectionCache);
             $key = key($this->reflectionCache);
-            unset($this->reflectionCache[$key]);
+            if ($key !== null) {
+                unset($this->reflectionCache[$key]);
+            }
         }
 
         $reflection = new \ReflectionClass($object);

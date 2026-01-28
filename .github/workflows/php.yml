@@ -53,4 +53,4 @@ jobs:
         version: 12
 
     - name: Psalm Static Analysis
-      run: ./vendor/bin/psalm
+      uses: docker://ghcr.io/psalm/psalm-github-actions

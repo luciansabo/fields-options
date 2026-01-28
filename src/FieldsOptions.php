@@ -17,7 +17,7 @@ class FieldsOptions
         self::FIELD_ALL
     ];
 
-    public function __construct(array $data = [], ValidatorInterface $validator = null)
+    public function __construct(array $data = [], ?ValidatorInterface $validator = null)
     {
         if ($data) {
             $validator ??= new Validator();
@@ -32,7 +32,7 @@ class FieldsOptions
      * @param string|null $fieldPath
      * @return array
      */
-    public function toArray(string $fieldPath = null): array
+    public function toArray(?string $fieldPath = null): array
     {
         $value = ArrayHelper::getValue($this->data, $fieldPath);
 
@@ -70,10 +70,10 @@ class FieldsOptions
      */
     public function getFieldOptions(?string $fieldPath): array
     {
-        if ($fieldPath) {
+        if ($fieldPath !== null) {
             $this->assertFieldExists($fieldPath);
         }
-        $finalPath = $fieldPath ? ($fieldPath . '.' . FieldsOptions::OPTIONS_KEY) : FieldsOptions::OPTIONS_KEY;
+        $finalPath = $fieldPath !== null ? ($fieldPath . '.' . FieldsOptions::OPTIONS_KEY) : FieldsOptions::OPTIONS_KEY;
 
         return ArrayHelper::getValue($this->data, $finalPath, []);
     }
@@ -86,8 +86,9 @@ class FieldsOptions
      * @param string $option
      * @param $default
      * @return mixed|null
+     * @psalm-suppress PossiblyUnusedMethod
      */
-    public function getFieldOption(?string $fieldPath, string $option, /*mixed*/ $default = null)
+    public function getFieldOption(?string $fieldPath, string $option, mixed $default = null): mixed
     {
         $options = $this->getFieldOptions($fieldPath);
         return $options[$option] ?? $default;
@@ -106,9 +107,9 @@ class FieldsOptions
      */
     public function hasGroupField(string $group, ?string $fieldPath = null): bool
     {
-        $path = $fieldPath ? ($fieldPath . '.' . $group) : $group;
+        $path = $fieldPath !== null ? ($fieldPath . '.' . $group) : $group;
 
-        if ($fieldPath && !$this->fieldExists($fieldPath)) {
+        if ($fieldPath !== null && !$this->fieldExists($fieldPath)) {
             throw new \InvalidArgumentException(sprintf('Field path "%s" is not available', $fieldPath));
         } elseif (!in_array($group, self::DEFAULT_GROUPS) && !$this->fieldExists($path)) {
             throw new \InvalidArgumentException(sprintf('Field "%s" is not available', $path));
@@ -160,15 +161,15 @@ class FieldsOptions
      */
     public function getIncludedFields(?string $fieldPath = null): array
     {
-        if ($fieldPath) {
+        if ($fieldPath !== null) {
             $this->assertFieldExists($fieldPath);
         }
 
         $data = ArrayHelper::getValue($this->data, $fieldPath);
         $fields = [];
         if (is_array($data)) {
-            foreach ($data as $field => $value) {
-                $_fieldPath = $fieldPath ? ($fieldPath . '.' . $field) : $field;
+            foreach ($data as $field => $_) {
+                $_fieldPath = $fieldPath !== null ? ($fieldPath . '.' . $field) : $field;
                 if ($this->isFieldIncluded($_fieldPath)) {
                     $fields[] = $field;
                 }
@@ -203,6 +204,10 @@ class FieldsOptions
      */
     public function getHash(): string
     {
-        return md5(json_encode($this->data));
+        $encoded = json_encode($this->data);
+        if ($encoded === false) {
+            throw new \RuntimeException('Failed to encode data for hashing');
+        }
+        return md5($encoded);
     }
 }

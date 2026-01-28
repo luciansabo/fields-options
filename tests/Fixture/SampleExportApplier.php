@@ -6,7 +6,7 @@ use Lucian\FieldsOptions\ExportApplierInterface;
 
 class SampleExportApplier implements ExportApplierInterface
 {
-    public function setExportedFields($data, ?array $fields)
+    public function setExportedFields(object|array $data, ?array $fields): object|array
     {
         if ($data instanceof AbstractDto) {
             // keep valid properties only
@@ -15,9 +15,11 @@ class SampleExportApplier implements ExportApplierInterface
             }
             $data->setExportedProperties($fields);
         }
+
+        return $data;
     }
 
-    public function getExportedFields($data): array
+    public function getExportedFields(object|array $data): array
     {
         if ($data instanceof AbstractDto) {
             return array_keys(iterator_to_array($data->getIterator()));

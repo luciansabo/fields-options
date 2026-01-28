@@ -13,8 +13,9 @@ interface ExportApplierInterface
      * @param object|array $data
      * @param array|null $fields
      * @return object|array $data with exported fields
+     * @psalm-suppress PossiblyUnusedReturnValue
      */
-    public function setExportedFields(/*object|array*/ $data, ?array $fields);
+    public function setExportedFields(object|array $data, ?array $fields): object|array;
 
     /**
      * Returns the properties exported by default on the object.
@@ -22,7 +23,7 @@ interface ExportApplierInterface
      * @param object|array $data
      * @return string[]
      */
-    public function getExportedFields(/*object|array*/ $data): array;
+    public function getExportedFields(object|array $data): array;
 
     /**
      * Should return the base class of your DTO

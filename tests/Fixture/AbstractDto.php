@@ -46,7 +46,7 @@ abstract class AbstractDto implements \JsonSerializable, \IteratorAggregate
      *
      * @return array
      */
-    public function jsonSerialize()
+    public function jsonSerialize(): mixed
     {
         $properties = iterator_to_array($this);
         if (count($properties) == 0) {

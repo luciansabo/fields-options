@@ -7,7 +7,7 @@ namespace Lucian\FieldsOptions;
  */
 class ArrayHelper
 {
-    public static function getValue(array $array, ?string $key, /*mixed*/ $default = null)/*: mixed*/
+    public static function getValue(array $array, ?string $key, mixed $default = null): mixed
     {
         if (is_string($key)) {
             $keys = explode('.', $key);
@@ -26,7 +26,7 @@ class ArrayHelper
         return null;
     }
 
-    public static function setValue(array &$array, ?string $key, /*mixed*/ $value): void
+    public static function setValue(array &$array, ?string $key, mixed $value): void
     {
         if (is_null($key)) {
             $array = $value;
@@ -52,6 +52,9 @@ class ArrayHelper
             $array = &$array[$key];
         }
 
-        $array[array_shift($keys)] = $value;
+        $lastKey = array_shift($keys);
+        if ($lastKey !== null) {
+            $array[$lastKey] = $value;
+        }
     }
 }

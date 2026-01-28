@@ -32,7 +32,6 @@ jobs:
       uses: php-actions/phpunit@v3
       with:
         bootstrap: vendor/autoload.php
-        args: --coverage-text
         configuration: phpunit.xml
         php_version: 8.3
         version: 12
@@ -41,7 +40,6 @@ jobs:
       uses: php-actions/phpunit@v3
       with:
         bootstrap: vendor/autoload.php
-        args: --coverage-text
         configuration: phpunit.xml
         php_version: 8.4
         version: 12
@@ -50,7 +48,6 @@ jobs:
       uses: php-actions/phpunit@v3
       with:
         bootstrap: vendor/autoload.php
-        args: --coverage-text
         configuration: phpunit.xml
         php_version: 8.5
         version: 12

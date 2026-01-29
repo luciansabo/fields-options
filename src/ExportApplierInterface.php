@@ -12,10 +12,9 @@ interface ExportApplierInterface
      *
      * @param object|array $data
      * @param array|null $fields
-     * @return object|array $data with exported fields
-     * @psalm-suppress PossiblyUnusedReturnValue
+     * @return void
      */
-    public function setExportedFields(object|array $data, ?array $fields): object|array;
+    public function setExportedFields(object|array $data, ?array $fields);
 
     /**
      * Returns the properties exported by default on the object.

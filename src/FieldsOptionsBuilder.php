@@ -71,7 +71,7 @@ class FieldsOptionsBuilder
 
             ArrayHelper::setValue($this->data, $fieldPath, $isIncluded);
         } else {
-            $basePath = $fieldPath !== null ? "$fieldPath." : $fieldPath;
+            $basePath = $fieldPath ? "$fieldPath." : $fieldPath;
 
             foreach ($fields as $field) {
                 if ($validateField) {
@@ -89,10 +89,10 @@ class FieldsOptionsBuilder
      */
     public function setFieldOption(?string $fieldPath, string $option, mixed $value): self
     {
-        if ($fieldPath !== null) {
+        if ($fieldPath) {
             $this->validateField($fieldPath);
         }
-        $finalPath = $fieldPath !== null ? ($fieldPath . '.' . FieldsOptions::OPTIONS_KEY) : FieldsOptions::OPTIONS_KEY;
+        $finalPath = $fieldPath ? ($fieldPath . '.' . FieldsOptions::OPTIONS_KEY) : FieldsOptions::OPTIONS_KEY;
         ArrayHelper::setValue($this->data, $finalPath . '.' . $option, $value);
 
         return $this;
@@ -103,11 +103,11 @@ class FieldsOptionsBuilder
      */
     public function setFieldOptions(?string $fieldPath, array $options): self
     {
-        if ($fieldPath !== null) {
+        if ($fieldPath) {
             $this->validateField($fieldPath);
         }
 
-        $finalPath = $fieldPath !== null ? ($fieldPath . '.' . FieldsOptions::OPTIONS_KEY) : FieldsOptions::OPTIONS_KEY;
+        $finalPath = $fieldPath ? ($fieldPath . '.' . FieldsOptions::OPTIONS_KEY) : FieldsOptions::OPTIONS_KEY;
 
         ArrayHelper::setValue(
             $this->data,

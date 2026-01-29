@@ -27,7 +27,7 @@ class Validator implements ValidatorInterface
                 continue;
             }
 
-            $fieldPath = $keyPath !== null ? "$keyPath.$key" : $key;
+            $fieldPath = $keyPath ? "$keyPath.$key" : $key;
             $this->validateField($fieldPath);
 
             if (is_array($datum)) {
@@ -42,7 +42,7 @@ class Validator implements ValidatorInterface
     #[\Override]
     public function validateField(?string $fieldPath): void
     {
-        if ($this->prototype === null || $fieldPath === null) {
+        if (!$this->prototype || !$fieldPath) {
             return;
         }
 

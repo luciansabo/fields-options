@@ -70,10 +70,10 @@ class FieldsOptions
      */
     public function getFieldOptions(?string $fieldPath): array
     {
-        if ($fieldPath !== null) {
+        if ($fieldPath) {
             $this->assertFieldExists($fieldPath);
         }
-        $finalPath = $fieldPath !== null ? ($fieldPath . '.' . FieldsOptions::OPTIONS_KEY) : FieldsOptions::OPTIONS_KEY;
+        $finalPath = $fieldPath ? ($fieldPath . '.' . FieldsOptions::OPTIONS_KEY) : FieldsOptions::OPTIONS_KEY;
 
         return ArrayHelper::getValue($this->data, $finalPath, []);
     }
@@ -107,9 +107,9 @@ class FieldsOptions
      */
     public function hasGroupField(string $group, ?string $fieldPath = null): bool
     {
-        $path = $fieldPath !== null ? ($fieldPath . '.' . $group) : $group;
+        $path = $fieldPath ? ($fieldPath . '.' . $group) : $group;
 
-        if ($fieldPath !== null && !$this->fieldExists($fieldPath)) {
+        if ($fieldPath && !$this->fieldExists($fieldPath)) {
             throw new \InvalidArgumentException(sprintf('Field path "%s" is not available', $fieldPath));
         } elseif (!in_array($group, self::DEFAULT_GROUPS) && !$this->fieldExists($path)) {
             throw new \InvalidArgumentException(sprintf('Field "%s" is not available', $path));
@@ -161,7 +161,7 @@ class FieldsOptions
      */
     public function getIncludedFields(?string $fieldPath = null): array
     {
-        if ($fieldPath !== null) {
+        if ($fieldPath) {
             $this->assertFieldExists($fieldPath);
         }
 
@@ -169,7 +169,7 @@ class FieldsOptions
         $fields = [];
         if (is_array($data)) {
             foreach ($data as $field => $_) {
-                $_fieldPath = $fieldPath !== null ? ($fieldPath . '.' . $field) : $field;
+                $_fieldPath = $fieldPath ? ($fieldPath . '.' . $field) : $field;
                 if ($this->isFieldIncluded($_fieldPath)) {
                     $fields[] = $field;
                 }

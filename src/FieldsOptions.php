@@ -62,6 +62,18 @@ class FieldsOptions
     }
 
     /**
+     * Copy with $prototype bound so isFieldIncluded() can resolve DefaultField / Group.
+     * Request data is unchanged and not re-validated.
+     */
+    public function withPrototype(object|string $prototype): self
+    {
+        $copy = clone $this;
+        $copy->schema = FieldSchema::fromPrototype($prototype);
+
+        return $copy;
+    }
+
+    /**
      * Effective inclusion: explicit request, _all, groups, and DefaultField at this scope.
      */
     public function isFieldIncluded(string $fieldPath): bool

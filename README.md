@@ -529,7 +529,8 @@ $options->hasGroupField('_basicInfo', 'profile'); // false
 $array = $options->toArray();
 ```
 
-Pass a DTO instance or class-string as the third constructor argument (or via `new Validator($dto)`).
+Pass the DTO (or class-string) to `Validator`; `FieldsOptions` reads the prototype from there. You can also pass it as the third constructor argument.
+
 Without a prototype, `isFieldIncluded()` stays explicit-only (plus `_all` at that scope).
 
 Note the difference between the three checks:
@@ -626,7 +627,7 @@ public function getIncludedFields(?string $fieldPath = null): array
 Applying the options means making sure the data is serialized as expected by the given options.
 The approach in FieldsOptionsObjectApplier is to provide your DTO and your implementation of an ExportApplierInterface.
 
-Classes that declare `#[DefaultField]` / `#[Group]` use calculated inclusion.
+Classes that declare `#[DefaultField]` / `#[Group]` use calculated inclusion (the `FieldsOptions` you pass should already have a prototype from the validator).
 Classes **without** those attributes keep the pre-2.0 behavior: defaults still come from `ExportApplierInterface::getExportedFields()` (for example `__exportedProperties` on your DTO). A nested mix is allowed (annotated parent, unannotated child).
 
 ```php

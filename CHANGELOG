@@ -4,7 +4,9 @@
 - Added `#[DefaultField]` and `#[Group]` attributes. Nested types are resolved with `symfony/type-info` `^7.4 || ^8.0` and `phpstan/phpdoc-parser` (phpdoc collections, no populated sample required).
 - `getIncludedFields()` with a prototype returns the effective field list (no meta keys). Without a prototype it stays explicit-only.
 - `FieldsOptions` / `FieldsOptionsBuilder` accept an optional prototype; `Builder::build()` forwards the validator prototype.
+- `FieldsOptions::withPrototype()` binds a prototype on a copy (request data unchanged). Used internally by the object applier; callers normally get the prototype from `Validator`.
 - `FieldsOptions::forField()` slices nested options and the resolved child class.
+- Locked `symfony/type-info` 7.4.x (`PHP >=8.2`) so `composer install` works on PHP 8.3. Constraint remains `^7.4 || ^8.0` for PHP 8.4+ consumers.
 - Validator rejects invalid nested collection fields from phpdoc/class-string (`education.missing`). Unresolvable types stay permissive.
 - `FieldsOptionsObjectApplier` uses calculated inclusion only on classes that declare the new attributes. Unannotated objects keep pre-2.0 `getExportedFields()` defaults.
 - **Migration:** replace `isFieldIncluded($f) || hasDefaultFields() || hasAllFields()` with `isFieldIncluded($f)` and pass a prototype. Callers that meant “explicitly listed as true” should use `isFieldExplicitlyIncluded()`.

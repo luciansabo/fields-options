@@ -40,7 +40,7 @@ class FieldsOptionsObjectApplier
         }
 
         if (FieldSchema::classDeclaresInclusionAttributes($object::class)) {
-            $this->applyWithAttributes($object, $fieldsOptions);
+            $this->applyWithAttributes($object, $fieldsOptions->withPrototype($object));
             return;
         }
 
@@ -49,6 +49,7 @@ class FieldsOptionsObjectApplier
 
     /**
      * Attribute-aware path: inclusion comes from isFieldIncluded / DefaultField / Group.
+     * $fieldsOptions is expected to already have a prototype (see apply() + withPrototype()).
      */
     private function applyWithAttributes(object $object, FieldsOptions $fieldsOptions): void
     {

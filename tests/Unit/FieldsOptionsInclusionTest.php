@@ -142,6 +142,30 @@ class FieldsOptionsInclusionTest extends TestCase
         $this->assertEquals(['id'], $options->getIncludedFields());
     }
 
+    public function testWithPrototypeEnablesCalculatedInclusionWithoutMutatingOriginal(): void
+    {
+        $options = new FieldsOptions([]);
+        $this->assertFalse($options->isFieldIncluded('id'));
+        $this->assertEquals([], $options->getIncludedFields());
+
+        $bound = $options->withPrototype(ProfileDto::class);
+        $this->assertTrue($bound->isFieldIncluded('id'));
+        $this->assertTrue($bound->isFieldIncluded('name'));
+        $this->assertFalse($bound->isFieldIncluded('description'));
+        $this->assertEquals(['id', 'name'], $bound->getIncludedFields());
+        $this->assertSame($options->toArray(), $bound->toArray());
+        $this->assertSame($options->getHash(), $bound->getHash());
+        $this->assertFalse($options->isFieldIncluded('id'));
+    }
+
+    public function testWithPrototypeOnExplicitListDoesNotAddDefaults(): void
+    {
+        $options = (new FieldsOptions(['id' => true]))->withPrototype(ProfileDto::class);
+        $this->assertTrue($options->isFieldIncluded('id'));
+        $this->assertFalse($options->isFieldIncluded('name'));
+        $this->assertEquals(['id'], $options->getIncludedFields());
+    }
+
     public function testNestedTrueUsesChildDefaultsFromPhpDoc(): void
     {
         $options = new FieldsOptions(['education' => true], null, ProfileDto::class);

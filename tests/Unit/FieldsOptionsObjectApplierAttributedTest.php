@@ -2,6 +2,7 @@
 
 namespace Lucian\FieldsOptions\Test\Unit;
 
+use Lucian\FieldsOptions\FieldsOptions;
 use Lucian\FieldsOptions\FieldsOptionsBuilder;
 use Lucian\FieldsOptions\FieldsOptionsObjectApplier;
 use Lucian\FieldsOptions\Test\Fixture\Attributed\ProfileDto as AttributedProfileDto;
@@ -78,6 +79,45 @@ class FieldsOptionsObjectApplierAttributedTest extends TestCase
         };
 
         $this->assertSame($this->applyUnannotated($configure), $this->applyAttributed($configure));
+    }
+
+    public function testApplyWithoutConstructorPrototypeUsesRuntimeObject(): void
+    {
+        $dto = AttributedProfileDto::getSampleDto();
+        $fieldsOptions = new FieldsOptions([]);
+
+        $this->applier->apply($dto, $fieldsOptions);
+
+        $this->assertSame(['id' => 1, 'name' => 'John'], $dto->jsonSerialize());
+    }
+
+    public function testApplyWithoutPrototypeExplicitFieldOnly(): void
+    {
+        $dto = AttributedProfileDto::getSampleDto();
+        $fieldsOptions = new FieldsOptions(['id' => true]);
+
+        $this->applier->apply($dto, $fieldsOptions);
+
+        $this->assertSame(['id' => 1], $dto->jsonSerialize());
+    }
+
+    public function testApplyWithoutPrototypeNestedChildDefaults(): void
+    {
+        $dto = AttributedProfileDto::getSampleDto();
+        $fieldsOptions = new FieldsOptions(['education' => true]);
+
+        $this->applier->apply($dto, $fieldsOptions);
+        $encoded = json_decode(json_encode($dto), true);
+
+        $this->assertSame(
+            [
+                ['institutionId' => 3, 'institutionName' => 'Columbia'],
+                ['institutionId' => 4, 'institutionName' => 'MIT'],
+            ],
+            $encoded['education']
+        );
+        $this->assertArrayNotHasKey('id', $encoded);
+        $this->assertArrayNotHasKey('name', $encoded);
     }
 
     public function testAttributedEmptyEducationUsesChildDefaultFields(): void

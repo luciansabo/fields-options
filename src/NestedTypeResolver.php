@@ -145,7 +145,8 @@ class NestedTypeResolver
     }
 
     /**
-     * Property exists but its nested type cannot be determined (mixed, multi-object union, …).
+     * Property exists but its nested type cannot be determined
+     * (mixed, object, untyped collection, multi-object union, intersection, …).
      *
      * @param class-string $class
      */
@@ -290,13 +291,35 @@ class NestedTypeResolver
         if ($type instanceof BuiltinType) {
             return in_array(
                 $type->getTypeIdentifier(),
-                [TypeIdentifier::MIXED, TypeIdentifier::ITERABLE, TypeIdentifier::ARRAY],
+                [
+                    TypeIdentifier::MIXED,
+                    TypeIdentifier::ITERABLE,
+                    TypeIdentifier::ARRAY,
+                    TypeIdentifier::OBJECT,
+                ],
                 true
             );
         }
 
         if ($type instanceof IntersectionType) {
             return true;
+        }
+
+        // TypeInfo wraps native array/iterable as CollectionType (value mixed when untyped).
+        if ($type instanceof CollectionType) {
+            return $this->isUnresolvedType($type->getCollectionValueType());
+        }
+
+        if ($type instanceof GenericType) {
+            $variables = $type->getVariableTypes();
+            if (count($variables) === 1) {
+                return $this->isUnresolvedType($variables[0]);
+            }
+            if (count($variables) === 2) {
+                return $this->isUnresolvedType($variables[1]);
+            }
+
+            return $this->isUnresolvedType($type->getWrappedType());
         }
 
         if ($type instanceof UnionType) {

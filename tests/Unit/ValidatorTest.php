@@ -119,6 +119,23 @@ class ValidatorTest extends TestCase
         $validator = new Validator(\Lucian\FieldsOptions\Test\Fixture\TypeResolutionDto::class);
         $this->expectNotToPerformAssertions();
         $validator->validateField('mystery.foo');
+        $validator->validateField('untypedNoDoc.foo');
+        $validator->validateField('untypedObject.foo');
+        $validator->validateField('untypedArray.foo');
+        $validator->validateField('nullableUntypedArray.foo');
+        $validator->validateField('untypedIterable.foo');
+        $validator->validateField('objectUnion.foo');
+        $validator->validateField('objectIntersection.foo');
+        $validator->validateField('nativeIntersection.foo');
+    }
+
+    public function testValidateScalarAndTypedCollectionNestedPathsStayInvalid(): void
+    {
+        $validator = new Validator(\Lucian\FieldsOptions\Test\Fixture\TypeResolutionDto::class);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Invalid field path 'intList.foo'");
+        $validator->validateField('intList.foo');
     }
 
     public function testGetPrototype(): void

@@ -226,7 +226,7 @@ flowchart LR
     single -->|no| fallback
 ```
 
-Unresolved types: `mixed`, multi-object unions, intersections, collections with no item class. TypeInfo cannot parse `\iterable|EducationDto[]|null` as one string; the resolver splits the `@var` union and resolves each part.
+Unresolved types: `mixed`, `object`, untyped `array`/`iterable` (no item class), multi-object unions, intersections. TypeInfo cannot parse `\iterable|EducationDto[]|null` as one string; the resolver splits the `@var` union and resolves each part.
 
 `IteratorAggregate` DTOs are reported as `CollectionType` wrapping the DTO class. If the collection value type is untyped, the wrapped object class is used (so `LocationDto` is not treated as `mixed`).
 

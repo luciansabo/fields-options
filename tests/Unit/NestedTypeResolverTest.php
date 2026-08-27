@@ -66,10 +66,21 @@ class NestedTypeResolverTest extends TestCase
     public function testUnresolvedMixedAndUnions(): void
     {
         $this->assertNull($this->resolver->resolvePropertyClass(TypeResolutionDto::class, 'mystery'));
+        $this->assertNull($this->resolver->resolvePropertyClass(TypeResolutionDto::class, 'untypedNoDoc'));
+        $this->assertNull($this->resolver->resolvePropertyClass(TypeResolutionDto::class, 'untypedObject'));
+        $this->assertNull($this->resolver->resolvePropertyClass(TypeResolutionDto::class, 'untypedArray'));
+        $this->assertNull($this->resolver->resolvePropertyClass(TypeResolutionDto::class, 'nullableUntypedArray'));
+        $this->assertNull($this->resolver->resolvePropertyClass(TypeResolutionDto::class, 'untypedIterable'));
+        $this->assertNull($this->resolver->resolvePropertyClass(TypeResolutionDto::class, 'intList'));
         $this->assertNull($this->resolver->resolvePropertyClass(TypeResolutionDto::class, 'scalarUnion'));
         $this->assertNull($this->resolver->resolvePropertyClass(TypeResolutionDto::class, 'objectUnion'));
         $this->assertNull($this->resolver->resolvePropertyClass(TypeResolutionDto::class, 'objectIntersection'));
+        $this->assertNull($this->resolver->resolvePropertyClass(TypeResolutionDto::class, 'nativeIntersection'));
         $this->assertNull($this->resolver->resolvePropertyClass(TypeResolutionDto::class, 'id'));
+        $this->assertSame(
+            LocationDto::class,
+            $this->resolver->resolvePropertyClass(TypeResolutionDto::class, 'objectOrString')
+        );
     }
 
     public function testResolveNestedPathOnProfileDtoWithoutInstance(): void
@@ -88,9 +99,19 @@ class NestedTypeResolverTest extends TestCase
     public function testUnresolvedNestedPathIsPermissive(): void
     {
         $this->assertTrue($this->resolver->pathExists(TypeResolutionDto::class, 'mystery.foo'));
+        $this->assertTrue($this->resolver->pathExists(TypeResolutionDto::class, 'untypedNoDoc.foo'));
+        $this->assertTrue($this->resolver->pathExists(TypeResolutionDto::class, 'untypedObject.foo'));
+        $this->assertTrue($this->resolver->pathExists(TypeResolutionDto::class, 'untypedArray.foo'));
+        $this->assertTrue($this->resolver->pathExists(TypeResolutionDto::class, 'nullableUntypedArray.foo'));
+        $this->assertTrue($this->resolver->pathExists(TypeResolutionDto::class, 'untypedIterable.foo'));
         $this->assertTrue($this->resolver->pathExists(TypeResolutionDto::class, 'objectUnion.foo'));
+        $this->assertTrue($this->resolver->pathExists(TypeResolutionDto::class, 'objectIntersection.foo'));
+        $this->assertTrue($this->resolver->pathExists(TypeResolutionDto::class, 'nativeIntersection.foo'));
         $this->assertFalse($this->resolver->pathExists(TypeResolutionDto::class, 'missing.foo'));
         $this->assertFalse($this->resolver->pathExists(TypeResolutionDto::class, 'id.foo'));
+        $this->assertFalse($this->resolver->pathExists(TypeResolutionDto::class, 'scalarUnion.foo'));
+        $this->assertFalse($this->resolver->pathExists(TypeResolutionDto::class, 'intList.foo'));
+        $this->assertFalse($this->resolver->pathExists(TypeResolutionDto::class, 'objectOrString.foo'));
         $this->assertFalse($this->resolver->pathExists(ProfileDto::class, 'location2.cityId.missing'));
     }
 

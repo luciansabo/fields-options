@@ -571,19 +571,46 @@ Group names must start with `_` and cannot be `_defaults`, `_all`, or `_opt`. Ne
 
 This library requires `symfony/type-info` `^7.4 || ^8.0` and `phpstan/phpdoc-parser`. Type-info 7.4 is a standalone package and installs beside Symfony 5.4 / 6.4 apps. If Flex `extra.symfony.require` pins every `symfony/*` package to `5.4.*` or `6.4.*`, exclude `symfony/type-info` from that pin.
 
-#### Validation if fields
+#### Validation of fields
 
 This library comes with a Validator implementation that should work with array and object prototypes: `Lucian\FieldsOptions\Validator`.
 
 You can provide the validator to both `FieldsOptions` and `FieldsOptionsBuilder`.
-A basic validator will be used in case it is not provider, that will only check the data structure.
+A basic validator will be used in case it is not provided, that will only check the data structure.
 
-If the validator is constructed with tbe prototype/schema, then including invalid fields will trigger a RuntimeException.
+If the validator is constructed with the prototype/schema, then including invalid fields will trigger a RuntimeException.
 
-> **How validation works:** The prototype (object, class-string, or array) is walked with Symfony TypeInfo.
-> Native types and phpdoc (`@var EducationDto[]`) are enough to validate nested collection fields — a populated sample is no longer required.
-> If a nested type cannot be resolved (`mixed`, unsupported unions), remaining path segments are accepted (same permissive fallback as before).
-> A missing property on a **resolved** class is invalid (`education.missing`).
+**How validation works:** The prototype (object, class-string, or array) is walked with Symfony TypeInfo.
+Native types and phpdoc (`@var EducationDto[]`) are enough to validate nested collection fields — a populated sample is no longer required.
+A missing property on a **resolved** class is invalid (`education.missing`).
+
+##### Relaxed validation of unknown nested types
+
+The validator only rejects a nested path when it can prove the path is invalid (the parent class was resolved and the property does not exist, or the parent is a scalar). When the nested type cannot be determined, remaining path segments are **accepted**. That is not the same as “included”: inclusion stays stricter and still requires an explicit request (or resolved `#[DefaultField]` / `#[Group]` / `_all` on a known class).
+
+Accepted by the validator, but nested type is **unknown** (no defaults/groups under that node):
+
+| Declaration | Example path | Validator | `isFieldIncluded()` |
+| --- | --- | --- | --- |
+| no type, no `@var` | `payload.foo` | accepted (unknown) | only if `payload.foo` is explicitly listed |
+| `mixed` | `mystery.foo` | accepted (unknown) | only if explicitly listed |
+| `object` | `payload.foo` | accepted (unknown) | only if explicitly listed |
+| `array` / `?array` with no item class | `items.foo` | accepted (unknown) | only if explicitly listed |
+| `iterable` with no item class | `items.foo` | accepted (unknown) | only if explicitly listed |
+| multi-object union `A\|B` | `union.foo` | accepted (unknown) | only if explicitly listed |
+| intersection `A&B` | `both.foo` | accepted (unknown) | only if explicitly listed |
+
+Still rejected (type is known enough to nest, or is not nestable):
+
+| Declaration | Example path | Validator |
+| --- | --- | --- |
+| `int` / `string` / `string\|int` | `id.foo` | rejected |
+| `LocationDto` | `location.missing` | rejected |
+| `@var EducationDto[]` | `education.missing` | rejected |
+| `@var int[]` | `ids.foo` | rejected |
+| `LocationDto\|string` | `value.missing` | rejected (`LocationDto` is used) |
+
+Untyped properties with `@var SomeDto` are resolved and stay strict. `_all` on an unknown parent does not invent child fields.
 
 #### Testing field groups
 

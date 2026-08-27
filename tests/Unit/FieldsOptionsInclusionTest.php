@@ -9,6 +9,7 @@ use Lucian\FieldsOptions\Test\Fixture\Attributed\EducationDto;
 use Lucian\FieldsOptions\Test\Fixture\Attributed\MixedDto;
 use Lucian\FieldsOptions\Test\Fixture\Attributed\ProfileDto;
 use Lucian\FieldsOptions\Test\Fixture\Attributed\RootDto;
+use Lucian\FieldsOptions\Test\Fixture\TypeResolutionDto;
 use Lucian\FieldsOptions\Validator;
 use PHPUnit\Framework\TestCase;
 
@@ -230,6 +231,18 @@ class FieldsOptionsInclusionTest extends TestCase
             MixedDto::class
         );
         $this->assertTrue($options->isFieldIncluded('id'));
+    }
+
+    public function testUntypedCollectionNestedPathsStayExplicit(): void
+    {
+        $options = new FieldsOptions(
+            ['_all' => true, 'untypedArray' => ['foo' => true]],
+            null,
+            TypeResolutionDto::class
+        );
+        $this->assertTrue($options->isFieldIncluded('untypedArray'));
+        $this->assertTrue($options->isFieldIncluded('untypedArray.foo'));
+        $this->assertFalse($options->isFieldIncluded('untypedArray.bar'));
     }
 
     public function testDateCreatedChildrenStayExplicit(): void

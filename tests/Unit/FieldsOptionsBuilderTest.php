@@ -42,7 +42,7 @@ class FieldsOptionsBuilderTest extends TestCase
         $this->assertTrue($fieldsOptions->isFieldIncluded('location.city'));
         $this->assertTrue($fieldsOptions->isFieldIncluded('location2.city'));
         $this->assertTrue($fieldsOptions->isFieldIncluded('education.institutionId'));
-        $this->assertEquals(['id', 'location', 'location2', 'education'], $fieldsOptions->getIncludedFields());
+        $this->assertEquals(['id', 'education', 'location', 'location2'], $fieldsOptions->getIncludedFields());
 
         // we currently can't properly validate iterables but this should work
         $this->builder->setFieldIncluded('education.institutionId');

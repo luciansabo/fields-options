@@ -39,6 +39,53 @@ class FieldsOptionsObjectApplier
             return;
         }
 
+        if (FieldSchema::classDeclaresInclusionAttributes($object::class)) {
+            $this->applyWithAttributes($object, $fieldsOptions);
+            return;
+        }
+
+        $this->applyLegacy($object, $fieldsOptions);
+    }
+
+    /**
+     * Attribute-aware path: inclusion comes from isFieldIncluded / DefaultField / Group.
+     */
+    private function applyWithAttributes(object $object, FieldsOptions $fieldsOptions): void
+    {
+        if ($this->isAllFieldsOnly($fieldsOptions)) {
+            $this->applier->setExportedFields($object, null);
+            return;
+        }
+
+        $reflection = $this->getReflection($object);
+        $includedProperties = [];
+        $supportedClass = $this->resolveSupportedClass();
+
+        foreach ($reflection->getProperties() as $reflectionProperty) {
+            $field = $reflectionProperty->getName();
+            if (str_starts_with($field, '__')) {
+                continue;
+            }
+            if (!$fieldsOptions->isFieldIncluded($field)) {
+                continue;
+            }
+
+            $includedProperties[] = $field;
+            $this->applyNestedValue(
+                $reflectionProperty->getValue($object),
+                $fieldsOptions->forField($field),
+                $supportedClass
+            );
+        }
+
+        $this->applier->setExportedFields($object, $includedProperties);
+    }
+
+    /**
+     * Pre-2.0 path for classes without DefaultField / Group attributes.
+     */
+    private function applyLegacy(object $object, FieldsOptions $fieldsOptions): void
+    {
         if ($fieldsOptions->getIncludedFields() == [FieldsOptions::FIELD_ALL => true]) {
             // only all fields requested
             $this->applier->setExportedFields($object, null);
@@ -65,10 +112,7 @@ class FieldsOptionsObjectApplier
         $defaults = $hasDefaultFields ? $this->applier->getExportedFields($object) : [];
 
         $includedProperties = [];
-        $supportedClass = $this->applier->getSupportedClass();
-        if (!class_exists($supportedClass)) {
-            $supportedClass = null;
-        }
+        $supportedClass = $this->resolveSupportedClass();
 
         foreach ($reflection->getProperties() as $reflectionProperty) {
             $field = $reflectionProperty->getName();
@@ -116,6 +160,59 @@ class FieldsOptionsObjectApplier
         }
 
         $this->applier->setExportedFields($object, $includedProperties);
+    }
+
+    /**
+     * @return class-string|null
+     */
+    private function resolveSupportedClass(): ?string
+    {
+        $supportedClass = $this->applier->getSupportedClass();
+        if (!class_exists($supportedClass)) {
+            return null;
+        }
+
+        return $supportedClass;
+    }
+
+    /**
+     * @param class-string|null $supportedClass
+     */
+    private function applyNestedValue(mixed $propertyValue, FieldsOptions $childOptions, ?string $supportedClass): void
+    {
+        if (
+            is_object($propertyValue) &&
+            (!is_iterable($propertyValue) ||
+                ($supportedClass && is_subclass_of($propertyValue, $supportedClass)))
+        ) {
+            $this->apply($propertyValue, $childOptions);
+            return;
+        }
+
+        if (is_iterable($propertyValue) && !$propertyValue instanceof \Generator) {
+            foreach ($propertyValue as $item) {
+                if (is_object($item)) {
+                    $this->apply($item, $childOptions);
+                }
+            }
+        }
+    }
+
+    private function isAllFieldsOnly(FieldsOptions $fieldsOptions): bool
+    {
+        if (!$fieldsOptions->hasAllFields()) {
+            return false;
+        }
+
+        foreach (array_keys($fieldsOptions->toArray()) as $key) {
+            if ($key === FieldsOptions::FIELD_ALL || $key === FieldsOptions::OPTIONS_KEY) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     /**

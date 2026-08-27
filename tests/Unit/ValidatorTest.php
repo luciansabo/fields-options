@@ -102,4 +102,29 @@ class ValidatorTest extends TestCase
             [['_defaults' => ['someOpt' => 1]]],
         ];
     }
+
+    public function testValidateNestedCollectionFromClassString(): void
+    {
+        $validator = new Validator(ProfileDto::class);
+        $validator->validateField('education.institutionName');
+        $validator->validateField('location2.city');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Invalid field path 'education.missing'");
+        $validator->validateField('education.missing');
+    }
+
+    public function testValidateUnresolvedNestedTypeIsPermissive(): void
+    {
+        $validator = new Validator(\Lucian\FieldsOptions\Test\Fixture\TypeResolutionDto::class);
+        $this->expectNotToPerformAssertions();
+        $validator->validateField('mystery.foo');
+    }
+
+    public function testGetPrototype(): void
+    {
+        $dto = ProfileDto::getSampleDto();
+        $this->assertSame($dto, (new Validator($dto))->getPrototype());
+        $this->assertSame(ProfileDto::class, (new Validator(ProfileDto::class))->getPrototype());
+    }
 }

@@ -383,6 +383,16 @@ Result:
 The `FieldsOptions` object encapsulates the provided options and can be constructed from an array (coming from a request)
 or using the `FieldsOptionsBuilder` if you want to configure them programmatically.
 
+To resolve implicit defaults and groups, pass the response DTO (or its class-string) as the prototype:
+
+```php
+$options = new FieldsOptions($data, new Validator(ProfileDto::class), ProfileDto::class);
+// or let FieldsOptions read the prototype from the built-in Validator
+$options = new FieldsOptions($data, new Validator($sampleDto));
+```
+
+See [docs/adr/adr-001-calculated-field-inclusion.md](docs/adr/adr-001-calculated-field-inclusion.md) for the inclusion algorithm and nested type walk.
+
 It is up to the caller to honor these field options, but the library comes with a class called `FieldsOptionsObjectApplier`
 that can be used to recursively apply the options on an object such as a DTO and his nested properties, so that the object will serialize with only the desired fields.
 
@@ -495,14 +505,14 @@ use Lucian\FieldsOptions\FieldsOptions;
 // $request = Request:::createFromGlobals();
 $data = json_decode($request->getContent());
 
-$options = new FieldsOptions($data);
+$options = new FieldsOptions($data, null, ProfileDto::class);
 
 $options->isFieldIncluded('id'); // true
 $options->isFieldIncluded('missing'); // false
 // field is present but value is false
 $options->isFieldIncluded('seo'); // false
 $options->isFieldIncluded('profile'); // true
-$options->isFieldIncluded('profile.education'); // true
+$options->isFieldIncluded('profile.education'); // true when education is a default/group/_all field on Profile
 $options->getFieldOption('profile.education', 'limit'); // 1
 $options->getFieldOption('profile.education', 'missing', 1); // 1 - default
 $options->getFieldOption('profile.education', 'missing'); // null - default
@@ -519,9 +529,46 @@ $options->hasGroupField('_basicInfo', 'profile'); // false
 $array = $options->toArray();
 ```
 
-Note the difference between `isFieldIncluded()` and `isFieldSpecified()`.
-`isFieldSpecified()` is simply a way to determine if the field was specified or not on the options, either with `true` or `false`.
-`isFieldIncluded()` will also check if the field is set to `true`.
+Pass a DTO instance or class-string as the third constructor argument (or via `new Validator($dto)`).
+Without a prototype, `isFieldIncluded()` stays explicit-only (plus `_all` at that scope).
+
+Note the difference between the three checks:
+
+- `isFieldSpecified()` — the path is present in the request (`true` or `false`).
+- `isFieldExplicitlyIncluded()` — the path is present and not `false` (the pre-2.0 `isFieldIncluded()`).
+- `isFieldIncluded()` — the **effective** result: explicit include/exclude, then `_all`, custom groups, and `#[DefaultField]` when defaults are active at that scope.
+
+If you used `isFieldIncluded($f) || hasDefaultFields() || hasAllFields()`, replace it with `isFieldIncluded($f)` **and** pass a prototype. Keeping the old workaround after upgrade still over-includes non-default fields.
+
+#### Declaring defaults and groups
+
+```php
+use Lucian\FieldsOptions\Attribute\DefaultField;
+use Lucian\FieldsOptions\Attribute\Group;
+
+class ProfileDto
+{
+    #[DefaultField]
+    #[Group('_basicInfo')]
+    public int $id;
+
+    #[DefaultField]
+    #[Group('_basicInfo')]
+    public string $name;
+
+    #[Group('_extended')]
+    public ?string $description = null;
+
+    /** @var EducationDto[] */
+    public array $education;
+}
+```
+
+Group names must start with `_` and cannot be `_defaults`, `_all`, or `_opt`. Nested collection item types are read from native types and phpdoc (`EducationDto[]`, `iterable<EducationDto>`, or `\iterable|EducationDto[]|null`). If a nested type cannot be resolved (mixed, multi-object union, intersection), descendants fall back to explicit inclusion only.
+
+#### Dependencies
+
+This library requires `symfony/type-info` `^7.4 || ^8.0` and `phpstan/phpdoc-parser`. Type-info 7.4 is a standalone package and installs beside Symfony 5.4 / 6.4 apps. If Flex `extra.symfony.require` pins every `symfony/*` package to `5.4.*` or `6.4.*`, exclude `symfony/type-info` from that pin.
 
 #### Validation if fields
 
@@ -532,11 +579,10 @@ A basic validator will be used in case it is not provider, that will only check 
 
 If the validator is constructed with tbe prototype/schema, then including invalid fields will trigger a RuntimeException.
 
-> **How validation works:** To validate fields, the prototype is analyzed using reflection.
-> All properties are considered valid fields. Typed properties have no issues, if they are scalar or classes.
-> For properties without type-hinting the validator tries to inspect the value.
-> If the value contains a collection, PHP does not have a Collection<T> type, and we cannot rely on phpdoc.
-> In that case, you have to populate the array with at least an object, and we assume they are all the same type.
+> **How validation works:** The prototype (object, class-string, or array) is walked with Symfony TypeInfo.
+> Native types and phpdoc (`@var EducationDto[]`) are enough to validate nested collection fields — a populated sample is no longer required.
+> If a nested type cannot be resolved (`mixed`, unsupported unions), remaining path segments are accepted (same permissive fallback as before).
+> A missing property on a **resolved** class is invalid (`education.missing`).
 
 #### Testing field groups
 
@@ -564,21 +610,24 @@ public function hasAllFields(?string $fieldPath = null): bool
 
 ```php
 /**
-* Returns the list of actually explicitly included fields
-* Does not know about defaults or groups. If a field is a default field it won't be returned here.
-* This will probably change in future versions to also include the default fields or coming from group fields
-* if they were included using the group
-*
-* @param string|null $fieldPath
-* @return array
-*/
+ * With a prototype: effective child field names (defaults, _all, groups, minus exclusions).
+ * Without a prototype: keys present in the request that are explicitly included.
+ *
+ * @param string|null $fieldPath
+ * @return array
+ */
 public function getIncludedFields(?string $fieldPath = null): array
 ```
+
+`{"profile": true}` then `getIncludedFields('profile')` returns the default fields of the nested DTO, not `[]`.
 
 ### Using the FieldsOptionsObjectApplier class
 
 Applying the options means making sure the data is serialized as expected by the given options.
 The approach in FieldsOptionsObjectApplier is to provide your DTO and your implementation of an ExportApplierInterface.
+
+Classes that declare `#[DefaultField]` / `#[Group]` use calculated inclusion.
+Classes **without** those attributes keep the pre-2.0 behavior: defaults still come from `ExportApplierInterface::getExportedFields()` (for example `__exportedProperties` on your DTO). A nested mix is allowed (annotated parent, unannotated child).
 
 ```php
 interface ExportApplierInterface

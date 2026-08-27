@@ -1,3 +1,15 @@
+### 2.0.0
+- `isFieldIncluded()` now returns the **effective** inclusion when a DTO prototype/class is provided (explicit request, `_all`, custom groups, `#[DefaultField]`).
+- Added `isFieldExplicitlyIncluded()` for the previous `isFieldIncluded()` meaning. `isFieldSpecified()` is unchanged.
+- Added `#[DefaultField]` and `#[Group]` attributes. Nested types are resolved with `symfony/type-info` `^7.4 || ^8.0` and `phpstan/phpdoc-parser` (phpdoc collections, no populated sample required).
+- `getIncludedFields()` with a prototype returns the effective field list (no meta keys). Without a prototype it stays explicit-only.
+- `FieldsOptions` / `FieldsOptionsBuilder` accept an optional prototype; `Builder::build()` forwards the validator prototype.
+- `FieldsOptions::forField()` slices nested options and the resolved child class.
+- Validator rejects invalid nested collection fields from phpdoc/class-string (`education.missing`). Unresolvable types stay permissive.
+- `FieldsOptionsObjectApplier` uses calculated inclusion only on classes that declare the new attributes. Unannotated objects keep pre-2.0 `getExportedFields()` defaults.
+- **Migration:** replace `isFieldIncluded($f) || hasDefaultFields() || hasAllFields()` with `isFieldIncluded($f)` and pass a prototype. Callers that meant “explicitly listed as true” should use `isFieldExplicitlyIncluded()`.
+- Flex `extra.symfony.require` of `5.4.*` / `6.4.*` must exclude `symfony/type-info` (it has no 5.4/6.4 line; 7.4 installs beside those frameworks as a standalone package).
+
 ### 1.5.3
 - fixed setFieldOptions overwrites fields , added tests
 - added support for options in setFieldOptions, setFieldOption, getFieldOptions, getFieldOption

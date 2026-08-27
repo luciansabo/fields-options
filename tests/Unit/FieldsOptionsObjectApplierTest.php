@@ -451,6 +451,36 @@ class FieldsOptionsObjectApplierTest extends TestCase
         $this->assertEquals('John', $result['name']);
     }
 
+    public function testUnannotatedPrototypeDoesNotIncludeUnmarkedDefaults(): void
+    {
+        $fieldsOptions = new FieldsOptions(
+            ['_defaults' => true],
+            new Validator($this->dto),
+            $this->dto
+        );
+        $this->applier->apply($this->dto, $fieldsOptions);
+
+        $this->assertEquals(
+            ['id' => 1, 'name' => 'John'],
+            $this->dto->jsonSerialize()
+        );
+        $this->assertArrayNotHasKey('description', $this->dto->jsonSerialize());
+    }
+
+    public function testUnannotatedEducationTrueStillExportsAllChildFields(): void
+    {
+        $fieldsOptions = $this->builder
+            ->setFieldIncluded('education', [])
+            ->build();
+
+        $this->applier->apply($this->dto, $fieldsOptions);
+        $encoded = json_decode(json_encode($this->dto), true);
+
+        $this->assertArrayHasKey('institutionId', $encoded['education'][0]);
+        $this->assertArrayHasKey('institutionName', $encoded['education'][0]);
+        $this->assertSame(['education'], array_keys($encoded));
+    }
+
     private function getSampleDto(): ProfileDto
     {
         return ProfileDto::getSampleDto();

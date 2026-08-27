@@ -5,13 +5,21 @@ namespace Lucian\FieldsOptions;
 class Validator implements ValidatorInterface
 {
     /**
-     * @var array|object|null
+     * @var array|object|string|null
      */
     private $prototype;
 
-    public function __construct(array|object|null $prototype = null)
+    private NestedTypeResolver $typeResolver;
+
+    public function __construct(array|object|string|null $prototype = null)
     {
         $this->prototype = $prototype;
+        $this->typeResolver = new NestedTypeResolver();
+    }
+
+    public function getPrototype(): array|object|string|null
+    {
+        return $this->prototype;
     }
 
     #[\Override]
@@ -50,60 +58,16 @@ class Validator implements ValidatorInterface
             if (ArrayHelper::getValue($this->prototype, $fieldPath, false) === false) {
                 throw new \RuntimeException("Invalid field path '$fieldPath'");
             }
-        } else {
-            if (!$this->objectPathExists($this->prototype, $fieldPath)) {
-                throw new \RuntimeException("Invalid field path '$fieldPath'");
-            }
-        }
-    }
-
-    /**
-     * Rudimentary property exist check by dot notation
-     * Works with nested object not with iterables of objects
-     *
-     * @param object $object
-     * @param string $path
-     * @return bool
-     * @throws \ReflectionException
-     */
-    private function objectPathExists(object $object, string $path): bool
-    {
-        $pathComponents = explode('.', $path);
-        $objectReflection = new \ReflectionClass($object);
-
-        foreach ($pathComponents as $property) {
-            if (!$objectReflection->hasProperty($property)) {
-                return false;
-            }
-
-            $reflectionProperty = $objectReflection->getProperty($property);
-            $type = $reflectionProperty->getType();
-
-            if ($type instanceof \ReflectionNamedType && class_exists($type->getName())) {
-                $objectReflection = new \ReflectionClass($type->getName());
-                $object = $objectReflection->newInstanceWithoutConstructor();
-            } elseif ($reflectionProperty->isInitialized($object)) {
-                // try to use value
-                $value = $reflectionProperty->getValue($object);
-                if (is_object($value)) {
-                    $objectReflection = new \ReflectionClass($value);
-                    $object = $value;
-                } elseif (is_array($value)) {
-                    $firstValue = reset($value);
-                    if (is_object($firstValue)) {
-                        $objectReflection = new \ReflectionClass($firstValue);
-                        $object = $firstValue;
-                    } else {
-                        // we cannot reliably determine types for uninitialized iterables
-                        return true;
-                    }
-                }
-            } else {
-                // we cannot reliably determine types for uninitialized iterables
-                return true;
-            }
+            return;
         }
 
-        return true;
+        $rootClass = is_object($this->prototype) ? $this->prototype::class : $this->prototype;
+        if (!is_string($rootClass) || !class_exists($rootClass)) {
+            return;
+        }
+
+        if (!$this->typeResolver->pathExists($rootClass, $fieldPath)) {
+            throw new \RuntimeException("Invalid field path '$fieldPath'");
+        }
     }
 }

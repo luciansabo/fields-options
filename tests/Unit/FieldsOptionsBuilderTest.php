@@ -247,4 +247,11 @@ class FieldsOptionsBuilderTest extends TestCase
         $this->assertTrue($fieldsOptions->hasAllFields('workHistory'));
         $this->assertTrue($fieldsOptions->hasGroupField('_basicInfo', 'location2'));
     }
+
+    public function testUnresolvablePrototypeClassThrows(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Unresolvable prototype class 'App\\Dto\\Typo'");
+        new FieldsOptionsBuilder(null, [], 'App\\Dto\\Typo');
+    }
 }

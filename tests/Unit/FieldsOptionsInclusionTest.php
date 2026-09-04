@@ -3,6 +3,7 @@
 namespace Lucian\FieldsOptions\Test\Unit;
 
 use Lucian\FieldsOptions\Attribute\Group;
+use Lucian\FieldsOptions\FieldSchema;
 use Lucian\FieldsOptions\FieldsOptions;
 use Lucian\FieldsOptions\FieldsOptionsBuilder;
 use Lucian\FieldsOptions\Test\Fixture\Attributed\EducationDto;
@@ -301,5 +302,33 @@ class FieldsOptionsInclusionTest extends TestCase
         $this->assertFalse($options->isFieldExplicitlyIncluded('name'));
         $this->assertFalse($options->isFieldSpecified('name'));
         $this->assertTrue($options->isFieldSpecified('id'));
+    }
+
+    public function testUnresolvablePrototypeClassThrowsInsteadOfFailingOpen(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Unresolvable prototype class 'App\\Dto\\Typo'");
+        new FieldsOptions(['whatever' => true], null, 'App\\Dto\\Typo');
+    }
+
+    public function testUnresolvableValidatorPrototypeDoesNotAcceptArbitraryPaths(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Unresolvable prototype class 'App\\Dto\\Typo'");
+        new FieldsOptions(['whatever' => true], new Validator('App\\Dto\\Typo'));
+    }
+
+    public function testWithPrototypeUnresolvableClassThrows(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Unresolvable prototype class 'App\\Dto\\Typo'");
+        (new FieldsOptions([]))->withPrototype('App\\Dto\\Typo');
+    }
+
+    public function testFromPrototypeUnresolvableClassThrows(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Unresolvable prototype class 'App\\Dto\\Typo'");
+        FieldSchema::fromPrototype('App\\Dto\\Typo');
     }
 }

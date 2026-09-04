@@ -27,6 +27,10 @@ class FieldsOptionsBuilder
             }
         }
 
+        if (is_string($prototype)) {
+            FieldSchema::requireClass($prototype);
+        }
+
         if ($data) {
             $validator ??= new Validator($prototype);
             $validator->validateData($data);

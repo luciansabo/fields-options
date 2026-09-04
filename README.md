@@ -579,6 +579,7 @@ You can provide the validator to both `FieldsOptions` and `FieldsOptionsBuilder`
 A basic validator will be used in case it is not provided, that will only check the data structure.
 
 If the validator is constructed with the prototype/schema, then including invalid fields will trigger a RuntimeException.
+A class-string prototype that cannot be autoloaded throws `InvalidArgumentException` — it does not skip validation.
 
 **How validation works:** The prototype (object, class-string, or array) is walked with Symfony TypeInfo.
 Native types and phpdoc (`@var EducationDto[]`) are enough to validate nested collection fields — a populated sample is no longer required.

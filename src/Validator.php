@@ -13,6 +13,9 @@ class Validator implements ValidatorInterface
 
     public function __construct(array|object|string|null $prototype = null)
     {
+        if (is_string($prototype)) {
+            FieldSchema::requireClass($prototype);
+        }
         $this->prototype = $prototype;
         $this->typeResolver = new NestedTypeResolver();
     }
@@ -63,7 +66,8 @@ class Validator implements ValidatorInterface
 
         $rootClass = is_object($this->prototype) ? $this->prototype::class : $this->prototype;
         if (!is_string($rootClass) || !class_exists($rootClass)) {
-            return;
+            $name = is_string($rootClass) ? $rootClass : get_debug_type($this->prototype);
+            throw new \InvalidArgumentException("Unresolvable prototype class '$name'");
         }
 
         if (!$this->typeResolver->pathExists($rootClass, $fieldPath)) {

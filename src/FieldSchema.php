@@ -22,6 +22,7 @@ class FieldSchema
         private readonly string $rootClass,
         private readonly NestedTypeResolver $resolver = new NestedTypeResolver(),
     ) {
+        self::requireClass($rootClass);
     }
 
     public static function fromPrototype(object|string|array|null $prototype): ?self
@@ -29,11 +30,24 @@ class FieldSchema
         if (is_object($prototype)) {
             return new self($prototype::class);
         }
-        if (is_string($prototype) && class_exists($prototype)) {
-            return new self($prototype);
+        if (is_string($prototype)) {
+            return new self(self::requireClass($prototype));
         }
 
         return null;
+    }
+
+    /**
+     * @return class-string
+     * @throws \InvalidArgumentException when $class is not autoloadable
+     */
+    public static function requireClass(string $class): string
+    {
+        if (!class_exists($class)) {
+            throw new \InvalidArgumentException("Unresolvable prototype class '$class'");
+        }
+
+        return $class;
     }
 
     /**

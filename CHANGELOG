@@ -8,6 +8,7 @@
 - `FieldsOptions::forField()` slices nested options and the resolved child class.
 - Locked `symfony/type-info` 7.4.x (`PHP >=8.2`) so `composer install` works on PHP 8.3. Constraint remains `^7.4 || ^8.0` for PHP 8.4+ consumers.
 - Validator rejects invalid nested collection fields from phpdoc/class-string (`education.missing`). Unresolvable types stay permissive (`mixed`, `object`, untyped `array`/`iterable`, multi-object unions, intersections).
+- Unresolvable class-string prototypes throw `InvalidArgumentException` instead of disabling field-path validation and calculated inclusion.
 - `FieldsOptionsObjectApplier` uses calculated inclusion only on classes that declare the new attributes. Unannotated objects keep pre-2.0 `getExportedFields()` defaults.
 - **Migration:** replace `isFieldIncluded($f) || hasDefaultFields() || hasAllFields()` with `isFieldIncluded($f)` and pass a prototype. Callers that meant “explicitly listed as true” should use `isFieldExplicitlyIncluded()`.
 - Flex `extra.symfony.require` of `5.4.*` / `6.4.*` must exclude `symfony/type-info` (it has no 5.4/6.4 line; 7.4 installs beside those frameworks as a standalone package).

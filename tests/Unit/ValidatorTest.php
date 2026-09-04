@@ -144,4 +144,18 @@ class ValidatorTest extends TestCase
         $this->assertSame($dto, (new Validator($dto))->getPrototype());
         $this->assertSame(ProfileDto::class, (new Validator(ProfileDto::class))->getPrototype());
     }
+
+    public function testUnresolvableClassStringThrowsInsteadOfDisablingValidation(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Unresolvable prototype class 'App\\Dto\\Typo'");
+        new Validator('App\\Dto\\Typo');
+    }
+
+    public function testNullPrototypeStillSkipsFieldValidation(): void
+    {
+        $this->expectNotToPerformAssertions();
+        (new Validator(null))->validateField('anything.at.all');
+        (new Validator())->validateField('anything.at.all');
+    }
 }

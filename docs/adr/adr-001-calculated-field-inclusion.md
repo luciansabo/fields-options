@@ -105,7 +105,7 @@ $options->getIncludedFields();
 $options->forField('education')->getIncludedFields();
 ```
 
-Passing the prototype as a third constructor argument is equivalent when you already have a class-string and no extra validator logic:
+Passing the prototype as a third constructor argument binds inclusion schema only. It does not validate field paths — pass a `Validator` for that:
 
 ```php
 $options = new FieldsOptions($data, null, ProfileDto::class);
@@ -163,7 +163,7 @@ What can go wrong after you add attributes:
 4. **Nested children get a schema they did not have in 1.x.** The attributed path uses `forField()`, which attaches the child class. Unannotated children still use `applyLegacy()`.
 5. **`_all: true` alone.** Attributed path calls `setExportedFields(null)` (export everything). Legacy lists reflected properties. They match in typical DTOs; they differ if reflection and `get_object_vars()` / `propertyExists()` do not see the same fields.
 
-`withPrototype()` does not re-validate, so apply does not throw new “invalid field” errors.
+`withPrototype()` does not re-validate. `forField()` binds the child prototype for inclusion only; the constructor does not synthesize a `Validator` from the prototype. Apply does not throw new “invalid field” errors.
 
 **Practical rule:** keep current DTOs unannotated and 1.x apply stays identical. When you annotate, treat attributes as the new source of defaults and keep them in sync with `__exportedProperties` (or drop that list for that class). Construct `FieldsOptions` with a `Validator` so the prototype is present from the start.
 

@@ -171,6 +171,19 @@ class FieldsOptionsObjectApplierAttributedTest extends TestCase
         $this->assertArrayNotHasKey('name', $encoded);
     }
 
+    public function testApplyDoesNotValidateUnknownNestedFields(): void
+    {
+        $dto = AttributedProfileDto::getSampleDto();
+        $fieldsOptions = new FieldsOptions(['education' => ['nosuchfield' => true]]);
+
+        $this->applier->apply($dto, $fieldsOptions);
+        $encoded = json_decode(json_encode($dto), true);
+
+        $this->assertSame([null, null], $encoded['education']);
+        $this->assertArrayNotHasKey('id', $encoded);
+        $this->assertArrayNotHasKey('name', $encoded);
+    }
+
     public function testAttributedEmptyEducationUsesChildDefaultFields(): void
     {
         $dto = AttributedProfileDto::getSampleDto();

@@ -529,7 +529,7 @@ $options->hasGroupField('_basicInfo', 'profile'); // false
 $array = $options->toArray();
 ```
 
-Pass the DTO (or class-string) to `Validator`; `FieldsOptions` reads the prototype from there. You can also pass it as the third constructor argument.
+Pass the DTO (or class-string) to `Validator`; `FieldsOptions` reads the prototype from there. You can also pass it as the third constructor argument to bind inclusion schema without validating field paths.
 
 Without a prototype, `isFieldIncluded()` stays explicit-only (plus `_all` at that scope).
 

@@ -31,7 +31,9 @@ class FieldsOptions
         }
 
         if ($data) {
-            $validator ??= new Validator($prototype);
+            // Prototype is inclusion schema only. Synthesizing Validator($prototype)
+            // would re-validate slices in forField() and throw from apply().
+            $validator ??= new Validator();
             $validator->validateData($data);
         }
         $this->data = $data;
@@ -53,6 +55,7 @@ class FieldsOptions
 
     /**
      * Slice options for a nested field, carrying the resolved child prototype.
+     * Does not re-validate the subtree; inclusion schema is bound without a Validator.
      */
     public function forField(string $fieldPath): self
     {

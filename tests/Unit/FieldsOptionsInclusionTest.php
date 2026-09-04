@@ -180,6 +180,33 @@ class FieldsOptionsInclusionTest extends TestCase
         $this->assertFalse($child->isFieldIncluded('missing'));
     }
 
+    public function testPrototypeDoesNotValidateUnknownFieldPaths(): void
+    {
+        $options = new FieldsOptions(
+            ['education' => ['nosuchfield' => true]],
+            null,
+            ProfileDto::class
+        );
+
+        $this->assertTrue($options->isFieldIncluded('education'));
+        $this->assertFalse($options->isFieldIncluded('id'));
+
+        $child = $options->forField('education');
+        $this->assertFalse($child->isFieldIncluded('institutionName'));
+        $this->assertSame([], $child->getIncludedFields());
+    }
+
+    public function testExplicitValidatorStillRejectsUnknownFieldPaths(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Invalid field path 'education.nosuchfield'");
+
+        new FieldsOptions(
+            ['education' => ['nosuchfield' => true]],
+            new Validator(ProfileDto::class)
+        );
+    }
+
     public function testNestedObjectTrueOnRootProfile(): void
     {
         $options = new FieldsOptions(['profile' => true], null, RootDto::class);

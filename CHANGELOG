@@ -1,4 +1,5 @@
 ### 2.0.0
+- `ValidatorInterface::getPrototype()` is required. `FieldsOptions` / `FieldsOptionsBuilder` read the inclusion prototype from the interface, not the concrete `Validator`. Custom implementations that omit it will not compile; implementations that already expose the method now get calculated inclusion.
 - `isFieldIncluded()` now returns the **effective** inclusion when a DTO prototype/class is provided (explicit request, `_all`, custom groups, `#[DefaultField]`).
 - Added `isFieldExplicitlyIncluded()` for the previous `isFieldIncluded()` meaning. `isFieldSpecified()` is unchanged.
 - Added `#[DefaultField]` and `#[Group]` attributes. Nested types are resolved with `symfony/type-info` `^7.4 || ^8.0` and `phpstan/phpdoc-parser` (phpdoc collections, no populated sample required).

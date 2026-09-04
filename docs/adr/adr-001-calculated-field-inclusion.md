@@ -22,7 +22,7 @@ The object applier had the same gap: without a prototype, `isFieldIncluded()` ne
 ## Decision
 
 1. Annotate DTO properties with `#[DefaultField]` and `#[Group('_name')]`.
-2. Bind a prototype (instance or class-string) onto `FieldsOptions` so inclusion can be calculated. The usual way is a `Validator` constructed with the DTO / class-string; `FieldsOptions` and `FieldsOptionsBuilder` read it from there.
+2. Bind a prototype (instance or class-string) onto `FieldsOptions` so inclusion can be calculated. The usual way is a `Validator` constructed with the DTO / class-string; `FieldsOptions` and `FieldsOptionsBuilder` read it via `ValidatorInterface::getPrototype()`. Custom implementations must supply that method — it is not optional on the interface.
 3. Walk nested types with Symfony TypeInfo (`TypeResolver` + `phpstan/phpdoc-parser`) so paths such as `education.institutionName` resolve `EducationDto` from phpdoc without a populated collection.
 4. Make `isFieldIncluded()` return the effective result. Keep `isFieldExplicitlyIncluded()` for the old meaning. Keep `hasDefaultFields()` / `hasAllFields()` / `hasGroupField()` on the explicit helper so meta keys stay correct.
 5. `FieldsOptionsObjectApplier`:
@@ -236,7 +236,7 @@ Scalars (`int`, `string`) are not nestable: `location.cityId.missing` is invalid
 
 - Breaking for callers that treated `isFieldIncluded()` as “explicitly listed”, once a prototype is provided (the usual case: `new Validator($dto)`).
 - Direct `isFieldIncluded()` calls without a prototype stay explicit-only.
-- `Builder::build()` forwards the validator prototype, so builder users with `new Validator($dto)` get calculated inclusion without extra steps.
+- `Builder::build()` forwards the validator prototype, so builder users with `new Validator($dto)` (or any `ValidatorInterface` whose `getPrototype()` returns an object/class-string) get calculated inclusion without extra steps.
 - `withPrototype()` is not a primary API. The applier uses it internally; callers would only need it for an already-built instance that has no prototype.
 - New dependencies: `symfony/type-info` `^7.4 || ^8.0`, `phpstan/phpdoc-parser`. Type-info 7.4 (PHP >=8.2) is what this library locks so `composer install` works on PHP 8.3; 8.x requires PHP >=8.4. Type-info 7.4 installs beside Symfony 5.4/6.4 unless Flex `extra.symfony.require` pins all `symfony/*` packages.
 - Validator is stricter on nested collections when phpdoc names the item class.

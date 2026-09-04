@@ -23,7 +23,7 @@ class FieldsOptions
         ?ValidatorInterface $validator = null,
         object|string|null $prototype = null,
     ) {
-        if ($prototype === null && $validator instanceof Validator) {
+        if ($prototype === null && $validator !== null) {
             $extracted = $validator->getPrototype();
             if (is_object($extracted) || is_string($extracted)) {
                 $prototype = $extracted;

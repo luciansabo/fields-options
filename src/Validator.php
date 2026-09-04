@@ -20,6 +20,7 @@ class Validator implements ValidatorInterface
         $this->typeResolver = new NestedTypeResolver();
     }
 
+    #[\Override]
     public function getPrototype(): array|object|string|null
     {
         return $this->prototype;

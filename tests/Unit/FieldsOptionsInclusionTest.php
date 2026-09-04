@@ -10,6 +10,7 @@ use Lucian\FieldsOptions\Test\Fixture\Attributed\EducationDto;
 use Lucian\FieldsOptions\Test\Fixture\Attributed\MixedDto;
 use Lucian\FieldsOptions\Test\Fixture\Attributed\ProfileDto;
 use Lucian\FieldsOptions\Test\Fixture\Attributed\RootDto;
+use Lucian\FieldsOptions\Test\Fixture\CustomValidator;
 use Lucian\FieldsOptions\Test\Fixture\TypeResolutionDto;
 use Lucian\FieldsOptions\Validator;
 use PHPUnit\Framework\TestCase;
@@ -286,6 +287,24 @@ class FieldsOptionsInclusionTest extends TestCase
         $options = $builder->setDefaultFieldsIncluded()->build();
         $this->assertTrue($options->isFieldIncluded('id'));
         $this->assertFalse($options->isFieldIncluded('description'));
+    }
+
+    public function testCustomValidatorInterfaceSuppliesPrototype(): void
+    {
+        $validator = new CustomValidator(ProfileDto::class);
+
+        $options = new FieldsOptions([], $validator);
+        $this->assertEquals(['id', 'name'], $options->getIncludedFields());
+
+        $built = (new FieldsOptionsBuilder($validator))->build();
+        $this->assertEquals(['id', 'name'], $built->getIncludedFields());
+    }
+
+    public function testCustomValidatorNullPrototypeStaysExplicitOnly(): void
+    {
+        $options = new FieldsOptions(['id' => true], new CustomValidator(null));
+        $this->assertEquals(['id'], $options->getIncludedFields());
+        $this->assertFalse($options->isFieldIncluded('name'));
     }
 
     public function testGroupAttributeRejectsReservedNames(): void

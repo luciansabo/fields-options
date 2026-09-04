@@ -578,6 +578,8 @@ This library comes with a Validator implementation that should work with array a
 You can provide the validator to both `FieldsOptions` and `FieldsOptionsBuilder`.
 A basic validator will be used in case it is not provided, that will only check the data structure.
 
+Custom `ValidatorInterface` implementations must provide `getPrototype()`. `FieldsOptions` and `FieldsOptionsBuilder` read the inclusion schema from that method on the interface — an object or class-string enables calculated inclusion; `null` or an array leaves it explicit-only.
+
 If the validator is constructed with the prototype/schema, then including invalid fields will trigger a RuntimeException.
 A class-string prototype that cannot be autoloaded throws `InvalidArgumentException` — it does not skip validation.
 

@@ -5,6 +5,7 @@ namespace Lucian\FieldsOptions\Test\Unit;
 use Lucian\FieldsOptions\FieldsOptions;
 use Lucian\FieldsOptions\FieldsOptionsBuilder;
 use Lucian\FieldsOptions\FieldsOptionsObjectApplier;
+use Lucian\FieldsOptions\Test\Fixture\Attributed\EducationDto as AttributedEducationDto;
 use Lucian\FieldsOptions\Test\Fixture\Attributed\ProfileDto as AttributedProfileDto;
 use Lucian\FieldsOptions\Test\Fixture\ProfileDto;
 use Lucian\FieldsOptions\Test\Fixture\SampleExportApplier;
@@ -79,6 +80,56 @@ class FieldsOptionsObjectApplierAttributedTest extends TestCase
         };
 
         $this->assertSame($this->applyUnannotated($configure), $this->applyAttributed($configure));
+    }
+
+    public function testApplyDoesNotReadUninitializedTypedProperties(): void
+    {
+        $dto = new AttributedProfileDto();
+        $dto->name = 'Jane';
+
+        $this->applier->apply($dto, new FieldsOptions([]));
+
+        $this->assertSame(['name' => 'Jane'], $dto->jsonSerialize());
+
+        $dto->id = 5;
+        $this->assertSame(['id' => 5, 'name' => 'Jane'], $dto->jsonSerialize());
+    }
+
+    public function testApplyDefaultsRequestDoesNotReadUninitializedTypedProperties(): void
+    {
+        $dto = new AttributedProfileDto();
+        $dto->name = 'Jane';
+        $fieldsOptions = $this->builder($dto)
+            ->setDefaultFieldsIncluded()
+            ->build();
+
+        $this->applier->apply($dto, $fieldsOptions);
+
+        $this->assertSame(['name' => 'Jane'], $dto->jsonSerialize());
+
+        $dto->id = 5;
+        $this->assertSame(['id' => 5, 'name' => 'Jane'], $dto->jsonSerialize());
+    }
+
+    public function testApplyDoesNotReadUninitializedNestedTypedProperties(): void
+    {
+        $dto = new AttributedProfileDto();
+        $dto->id = 1;
+        $education = new AttributedEducationDto();
+        $education->institutionName = 'MIT';
+        $dto->education = [$education];
+
+        $this->applier->apply($dto, new FieldsOptions(['education' => true]));
+
+        $encoded = json_decode(json_encode($dto), true);
+        $this->assertSame([['institutionName' => 'MIT']], $encoded['education']);
+
+        $education->institutionId = 4;
+        $encoded = json_decode(json_encode($dto), true);
+        $this->assertSame(
+            [['institutionId' => 4, 'institutionName' => 'MIT']],
+            $encoded['education']
+        );
     }
 
     public function testApplyWithoutConstructorPrototypeUsesRuntimeObject(): void

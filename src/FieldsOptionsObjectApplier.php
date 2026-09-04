@@ -72,6 +72,10 @@ class FieldsOptionsObjectApplier
             }
 
             $includedProperties[] = $field;
+            if (!$reflectionProperty->isInitialized($object)) {
+                continue;
+            }
+
             $this->applyNestedValue(
                 $reflectionProperty->getValue($object),
                 $fieldsOptions->forField($field),

@@ -31,9 +31,6 @@
             "phpcs --standard=phpcs.xml src tests"
         ]
     },
-    "config": {
-        "run-scripts": false
-    },
     "authors": [
         {
             "name": "Lucian Sabo",

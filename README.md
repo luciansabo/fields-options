@@ -68,7 +68,7 @@ The fields groups do not support any options, and they can only be `true` or `fa
 
 There are two special groups: `_defaults` and `_all`.
 
-- If you want to indicate that the endpoint should return you the default fields or not use `_defauls` as field.   
+- If you want to indicate that the endpoint should return you the default fields or not use `_defaults` as field.   
 - If you want to indicate that the endpoint should return you all available fields or not use `_all` as field.
 
 #### _defaults group
@@ -383,13 +383,14 @@ Result:
 The `FieldsOptions` object encapsulates the provided options and can be constructed from an array (coming from a request)
 or using the `FieldsOptionsBuilder` if you want to configure them programmatically.
 
-To resolve implicit defaults and groups, pass the response DTO (or its class-string) as the prototype:
+To resolve implicit defaults and groups, pass the response DTO (or its class-string) to `Validator`. `FieldsOptions` reads the prototype from there and validates field paths:
 
 ```php
-$options = new FieldsOptions($data, new Validator(ProfileDto::class), ProfileDto::class);
-// or let FieldsOptions read the prototype from the built-in Validator
+$options = new FieldsOptions($data, new Validator(RootDto::class));
 $options = new FieldsOptions($data, new Validator($sampleDto));
 ```
+
+Unless a sample declares its own classes, the PHP samples in this section use the attributed DTOs from `tests/Fixture/Attributed`: `RootDto` (`id`, `seo`, `profile`), where `profile` is a `ProfileDto` (see [Declaring defaults and groups](#declaring-defaults-and-groups); the fixture has a few more properties) whose `education` items are `EducationDto` (`institutionId`, `institutionName`) and `workHistory` items are `WorkplaceDto` (`id`, `employerName`, `startYear`, `endYear`).
 
 See [docs/adr/adr-001-calculated-field-inclusion.md](docs/adr/adr-001-calculated-field-inclusion.md) for the inclusion algorithm and nested type walk.
 
@@ -434,18 +435,18 @@ In general, it is recommended to use the builder instead of manually creating th
  * @param array $fields Optional list of included field (you can use relative paths in dot notation too)
  * @return $this
 */
-public function setFieldIncluded(?string $fieldPath, array $fields = []): self`
+public function setFieldIncluded(?string $fieldPath, array $fields = []): self
 ```
 
 You can optionally use a validator that receives a sample DTO.
-The validator will receive an object (preferred) or an array representing the schema of the response.
+The validator will receive an object or class-string (preferred) or an array representing the schema of the response. An array only validates field paths; it does not enable calculated inclusion.
 
 ```php
 
 use Lucian\FieldsOptions\FieldsOptionsBuilder;
 use Lucian\FieldsOptions\Validator;
 
-$validator = new Validator($this->getSampleDto());
+$validator = new Validator(RootDto::class);
 $builder = new FieldsOptionsBuilder($validator);
 $fieldsOptions = $builder
     ->setFieldIncluded('id')
@@ -454,24 +455,28 @@ $fieldsOptions = $builder
     ->setFieldOption('profile.education', 'limit', 1)
     ->setFieldOption('profile.education', 'sort', 'startYear')
     ->setFieldOption('profile.education', 'sortDir', 'asc')
-    ->build()
+    ->build();
 ```
 
 You can include or exclude multiple fields at once from a given path
 
 ```php
-$fieldsOptions = $this->builder
-    ->setFieldIncluded(null, ['name']) // this is equivalent to setFieldIncluded('name') 
-    ->setFieldIncluded('profile', ['workHistory']) // include profile.workHistory
-    ->setFieldExcluded('profile.workHistory', ['institution']) // but exclude profile.workHistory.institution
-    ->setFieldIncluded('profile.education', ['id', 'name']) // include profile.education.id and profile.education.name    
-    ->setFieldIncluded('profile', ['education.startYear']) // include profile.education.startYear. the field can be a relative path
+$fieldsOptions = (new FieldsOptionsBuilder($validator))
+    ->setFieldIncluded(null, ['id']) // this is equivalent to setFieldIncluded('id')
+    ->setFieldIncluded('profile.education', ['institutionId']) // include profile.education.institutionId
+    ->setFieldIncluded('profile', ['education.institutionName']) // the field can be a relative path
+    ->setDefaultFieldsIncluded('profile.workHistory') // include profile.workHistory with its default fields
+    ->setFieldExcluded('profile.workHistory', ['employerName']) // but exclude profile.workHistory.employerName
     ->build();
+
+$fieldsOptions->getIncludedFields('profile.workHistory'); // ['id']
 ```
+
+Excluding a field adds it to that level's field list, which turns implicit defaults off under calculated inclusion. That is why `setDefaultFieldsIncluded()` comes first above; without it `getIncludedFields('profile.workHistory')` is `[]`. (Unannotated classes on the legacy applier path ignore a level that has only `false` keys and keep the object's own defaults, as 1.x did.)
 
 You also have methods to set all the options for a field at once
 
-`public function setFieldOptions(string $fieldPath, array $options): self`
+`public function setFieldOptions(?string $fieldPath, array $options): self`
 
 ```php
 $educationOptions = ['limit' => 2, 'offset' => 5];
@@ -485,7 +490,7 @@ You can set a custom group field included
 ```php
 $fieldsOptions = $builder->setGroupFieldIncluded('_basicInfo', 'profile')
     ->build();
-$fieldsOptions->hasGroupField('_basicInfo', 'profile') // true
+$fieldsOptions->hasGroupField('_basicInfo', 'profile'); // true
 ```
 
 You can also create a builder with initial data. One scenario would be to add options to existing fields options.
@@ -493,45 +498,52 @@ You can also create a builder with initial data. One scenario would be to add op
 ```php
 $data = $fieldsOptions->toArray();
 $builder = new FieldsOptionsBuilder($validator, $data);
-$builder->setFieldIncluded('fancyField');
+$builder->setFieldIncluded('profile.description');
 ```
+
+With a prototype, the builder validates every path it sets: an unknown field throws `RuntimeException`.
 
 ### Using the FieldsOptions class
 
 ```php
 use Lucian\FieldsOptions\FieldsOptions;
+use Lucian\FieldsOptions\Validator;
 
 // assuming we use the Symfony request
-// $request = Request:::createFromGlobals();
-$data = json_decode($request->getContent());
+// $request = Request::createFromGlobals();
+$data = json_decode($request->getContent(), true);
 
-$options = new FieldsOptions($data, null, ProfileDto::class);
+$options = new FieldsOptions($data, new Validator(RootDto::class));
 
 $options->isFieldIncluded('id'); // true
 $options->isFieldIncluded('missing'); // false
 // field is present but value is false
 $options->isFieldIncluded('seo'); // false
 $options->isFieldIncluded('profile'); // true
-$options->isFieldIncluded('profile.education'); // true when education is a default/group/_all field on Profile
+// profile has a field list (education), so its defaults are off
+$options->isFieldIncluded('profile.name'); // false
+$options->isFieldIncluded('profile.education'); // true
+// _all on education
+$options->isFieldIncluded('profile.education.institutionName'); // true
 $options->getFieldOption('profile.education', 'limit'); // 1
 $options->getFieldOption('profile.education', 'missing', 1); // 1 - default
 $options->getFieldOption('profile.education', 'missing'); // null - default
 
-// field groups
-$options->hasDefaultFields(); // true
+// field groups (request only, attributes are not consulted)
+$options->hasDefaultFields(); // false - the root has a field list and no _defaults
 $options->hasDefaultFields('profile'); // false
 $options->hasAllFields('profile'); // false
 $options->hasAllFields('profile.education'); // true
-$options->hasAllFields('profiles.missing'); // throws exception
-$options->hasGroupField('_basicInfo', 'profile'); // false
+$options->hasAllFields('profiles.missing'); // throws InvalidArgumentException
+$options->hasGroupField('_basicInfo', 'profile'); // throws InvalidArgumentException - custom groups must be present in the request
         
 // you can export the entire structure
 $array = $options->toArray();
 ```
 
-Pass the DTO (or class-string) to `Validator`; `FieldsOptions` reads the prototype from there. You can also pass it as the third constructor argument to bind inclusion schema without validating field paths.
+Pass the DTO (or class-string) to `Validator`; `FieldsOptions` reads the prototype from there and validates field paths.
 
-Without a prototype, `isFieldIncluded()` stays explicit-only (plus `_all` at that scope).
+Without a prototype, `isFieldIncluded()` stays explicit-only (plus `_all` at that scope; 1.x returned `false` for unlisted fields under `_all`).
 
 Note the difference between the three checks:
 
@@ -565,7 +577,44 @@ class ProfileDto
 }
 ```
 
-Group names must start with `_` and cannot be `_defaults`, `_all`, or `_opt`. Nested collection item types are read from native types and phpdoc (`EducationDto[]`, `iterable<EducationDto>`, or `\iterable|EducationDto[]|null`). If a nested type cannot be resolved (mixed, multi-object union, intersection), descendants fall back to explicit inclusion only.
+Group names must start with `_` and cannot be `_defaults`, `_all`, or `_opt`. Invalid names throw `InvalidArgumentException` when the prototype is bound (`new FieldsOptions`, `withPrototype()`, `new FieldSchema`) — including nested DTO types — not when querying inclusion. The check walks the DTO graph and resolves its types, so the first bind of a class costs up to a few milliseconds depending on graph size; the result is remembered per class for the rest of the process and later binds skip the walk. A class with an invalid name is not remembered and throws on every bind. Nested collection item types are read from native types and phpdoc (`EducationDto[]`, `iterable<EducationDto>`, or `\iterable|EducationDto[]|null`). If a nested type cannot be resolved (mixed, multi-object union, intersection), descendants fall back to explicit inclusion only.
+
+#### Excluding properties with `#[Ignore]`
+
+Mark a property `#[Ignore]` when it is not a field: it is never requestable, exported, validated or walked. Static properties are never fields either. Both are rejected by `Validator` as field paths and are never passed to `setExportedFields()`. Property names starting with `__` get no special treatment; mark them `#[Ignore]` if they are bookkeeping state.
+
+`#[Ignore]` survives redeclaration. If an ancestor's declaration (not `private`) or a used trait carries it, a subclass that redeclares the property is still ignored, so a DTO base class needs the attribute only once:
+
+```php
+use Lucian\FieldsOptions\Attribute\Ignore;
+
+abstract class AbstractDto
+{
+    #[Ignore]
+    protected ?array $__exportedProperties = null;
+
+    #[Ignore]
+    protected array $__excludedProperties = [];
+
+    // ... export logic
+}
+
+class WorkplaceDto extends AbstractDto
+{
+    // still ignored: the AbstractDto declaration carries #[Ignore]
+    protected ?array $__exportedProperties = ['id' => true, 'employerName' => true];
+
+    public int $id;
+    public string $employerName;
+}
+
+$options = new FieldsOptions(['_all' => true], new Validator(WorkplaceDto::class));
+$options->getIncludedFields(); // ['id', 'employerName']
+
+(new Validator(WorkplaceDto::class))->validateField('__exportedProperties'); // throws RuntimeException
+```
+
+If you upgrade from 1.x and your DTO base class keeps state in properties like these, add `#[Ignore]` on the base-class declarations. Without it they are ordinary fields: `_all` includes them and the validator accepts them.
 
 #### Dependencies
 
@@ -583,9 +632,10 @@ Custom `ValidatorInterface` implementations must provide `getPrototype()`. `Fiel
 If the validator is constructed with the prototype/schema, then including invalid fields will trigger a RuntimeException.
 A class-string prototype that cannot be autoloaded throws `InvalidArgumentException` — it does not skip validation.
 
-**How validation works:** The prototype (object, class-string, or array) is walked with Symfony TypeInfo.
+**How validation works:** An object or class-string prototype is walked with Symfony TypeInfo; an array prototype is matched key by key.
 Native types and phpdoc (`@var EducationDto[]`) are enough to validate nested collection fields — a populated sample is no longer required.
-A missing property on a **resolved** class is invalid (`education.missing`).
+A missing property on a **resolved** class is invalid (`education.missing`), and so are static and `#[Ignore]` properties.
+Request keys starting with `_` are read as groups and are not checked against the prototype.
 
 ##### Relaxed validation of unknown nested types
 
@@ -650,7 +700,25 @@ public function hasAllFields(?string $fieldPath = null): bool
 public function getIncludedFields(?string $fieldPath = null): array
 ```
 
-`{"profile": true}` then `getIncludedFields('profile')` returns the default fields of the nested DTO, not `[]`.
+`{"profile": true}` then `getIncludedFields('profile')` returns the default fields of the nested DTO (`['id', 'name']`), not `[]`.
+
+If you call `getIncludedFields()` directly, the result changes once you pass a `Validator` prototype: `{"_defaults": true}` gives `['_defaults']` without a prototype (request keys, as in 1.x) and `['id', 'profile']` with `new Validator(RootDto::class)`.
+
+#### Options for a nested field
+
+`forField()` slices the options for a nested field. The slice carries the resolved child prototype, so inclusion inside it is calculated against the child DTO without passing a prototype again. The slice is not re-validated.
+
+```php
+$options = new FieldsOptions(
+    ['profile' => ['education' => ['institutionName' => true]]],
+    new Validator(RootDto::class)
+);
+
+$profile = $options->forField('profile'); // bound to ProfileDto
+$profile->toArray(); // ['education' => ['institutionName' => true]]
+$profile->isFieldIncluded('name'); // false - profile has a field list
+$profile->getIncludedFields('education'); // ['institutionName']
+```
 
 ### Using the FieldsOptionsObjectApplier class
 
@@ -658,7 +726,15 @@ Applying the options means making sure the data is serialized as expected by the
 The approach in FieldsOptionsObjectApplier is to provide your DTO and your implementation of an ExportApplierInterface.
 
 Classes that declare `#[DefaultField]` / `#[Group]` use calculated inclusion (the `FieldsOptions` you pass should already have a prototype from the validator).
-Classes **without** those attributes keep the pre-2.0 behavior: defaults still come from `ExportApplierInterface::getExportedFields()` (for example `__exportedProperties` on your DTO). A nested mix is allowed (annotated parent, unannotated child).
+Classes **without** those attributes keep the pre-2.0 behavior: defaults still come from `ExportApplierInterface::getExportedFields()` (for example `__exportedProperties` on your DTO). That path uses `isFieldExplicitlyIncluded()`, so constructing `FieldsOptions` with a `Validator` does not change the list passed to `setExportedFields()`. A nested mix is allowed (annotated parent, unannotated child).
+
+For unannotated classes the list passed to `setExportedFields()` matches 1.x, except:
+
+- A request with only `_all` at a level (optionally with `_opt`) passes `null` (export everything) instead of the reflected property list.
+- Static and `#[Ignore]` properties are never passed.
+- Uninitialized typed properties are listed when included but not read; 1.x threw an `Error`.
+
+See [the ADR](docs/adr/adr-001-calculated-field-inclusion.md#compatibility-of-the-applier-safety-net) for details.
 
 ```php
 interface ExportApplierInterface
@@ -671,9 +747,9 @@ interface ExportApplierInterface
      *
      * @param object|array $data
      * @param array|null $fields
-     * @return object|array $data with exported fields
+     * @return void
      */
-    public function setExportedFields(/*object|array*/ $data, ?array $fields): void;
+    public function setExportedFields(object|array $data, ?array $fields);
 
     /**
      * Returns the properties exported by default on the object.
@@ -681,7 +757,7 @@ interface ExportApplierInterface
      * @param object|array $data
      * @return string[]
      */
-    public function getExportedFields(/*object|array*/ $data): array;
+    public function getExportedFields(object|array $data): array;
 
     /**
      * Should return the base class of your DTO
@@ -726,7 +802,7 @@ class SampleExportApplier implements ExportApplierInterface
 
 ```php
 $applier = new FieldsOptionsObjectApplier(new SampleExportApplier());
-$dto = $this->getSampleDto();
+$dto = ProfileDto::getSampleDto(); // a populated ProfileDto
 
 $fieldsOptions = (new FieldsOptionsBuilder())    
     ->setFieldIncluded('id')
@@ -735,5 +811,5 @@ $fieldsOptions = (new FieldsOptionsBuilder())
 $applier->apply($dto, $fieldsOptions);
 
 // now DTO should only serialize the id field
-echo json_encode($dto);
+echo json_encode($dto); // {"id":1}
 ```

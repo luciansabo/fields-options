@@ -12,6 +12,9 @@ class FieldsOptions
     public const FIELD_ALL = '_all';
     private array $data;
     private ?FieldSchema $schema;
+    private ?NestedTypeResolver $typeResolver = null;
+    private ?FieldSchemaCache $schemaCache = null;
+    private static ?Validator $sliceValidator = null;
 
     public const DEFAULT_GROUPS = [
         self::FIELD_DEFAULTS,
@@ -21,23 +24,18 @@ class FieldsOptions
     public function __construct(
         array $data = [],
         ?ValidatorInterface $validator = null,
-        object|string|null $prototype = null,
     ) {
-        if ($prototype === null && $validator !== null) {
-            $extracted = $validator->getPrototype();
-            if (is_object($extracted) || is_string($extracted)) {
-                $prototype = $extracted;
-            }
+        $prototype = $validator?->getPrototype();
+        if (!is_object($prototype) && !is_string($prototype)) {
+            $prototype = null;
         }
 
         if ($data) {
-            // Prototype is inclusion schema only. Synthesizing Validator($prototype)
-            // would re-validate slices in forField() and throw from apply().
             $validator ??= new Validator();
             $validator->validateData($data);
         }
         $this->data = $data;
-        $this->schema = FieldSchema::fromPrototype($prototype);
+        $this->schema = $this->schemaFor($prototype);
     }
 
     /**
@@ -61,7 +59,30 @@ class FieldsOptions
     {
         $nestedPrototype = $this->schema?->resolveClass($fieldPath);
 
-        return new self($this->toArray($fieldPath), null, $nestedPrototype);
+        return $this->copyWith($this->toArray($fieldPath), $nestedPrototype);
+    }
+
+    /**
+     * Data-only slice for a nested field, equivalent to `new FieldsOptions($this->toArray($fieldPath))`
+     * (no schema, subtree re-validated by the default Validator), but type and schema caches stay
+     * shared with this instance.
+     *
+     * @internal used by FieldsOptionsObjectApplier for unannotated parents
+     */
+    public function sliceWithoutSchema(string $fieldPath): self
+    {
+        $data = $this->toArray($fieldPath);
+        if ($data) {
+            (self::$sliceValidator ??= new Validator())->validateData($data);
+        }
+
+        $copy = clone $this;
+        $copy->data = $data;
+        $copy->schema = null;
+        $copy->typeResolver = $this->typeResolver();
+        $copy->schemaCache = $this->schemaCache();
+
+        return $copy;
     }
 
     /**
@@ -70,10 +91,47 @@ class FieldsOptions
      */
     public function withPrototype(object|string $prototype): self
     {
+        return $this->copyWith($this->data, $prototype);
+    }
+
+    /**
+     * @param object|string|null $prototype
+     */
+    private function copyWith(array $data, object|string|null $prototype): self
+    {
+        // Resolve on $this before clone so repeated withPrototype()/forField()
+        // (including the attributed applier) share NestedTypeResolver and FieldSchemaCache.
+        $hasPrototype = is_object($prototype) || is_string($prototype);
+        $resolver = $hasPrototype ? $this->typeResolver() : $this->typeResolver;
+        $schemaCache = $hasPrototype ? $this->schemaCache() : $this->schemaCache;
+
         $copy = clone $this;
-        $copy->schema = FieldSchema::fromPrototype($prototype);
+        $copy->data = $data;
+        $copy->schema = FieldSchema::fromPrototype($prototype, $resolver, $schemaCache);
 
         return $copy;
+    }
+
+    /**
+     * @param object|string|array|null $prototype
+     */
+    private function schemaFor(object|string|array|null $prototype): ?FieldSchema
+    {
+        if (!is_object($prototype) && !is_string($prototype)) {
+            return null;
+        }
+
+        return FieldSchema::fromPrototype($prototype, $this->typeResolver(), $this->schemaCache());
+    }
+
+    private function typeResolver(): NestedTypeResolver
+    {
+        return $this->typeResolver ??= new NestedTypeResolver();
+    }
+
+    private function schemaCache(): FieldSchemaCache
+    {
+        return $this->schemaCache ??= new FieldSchemaCache();
     }
 
     /**
@@ -238,6 +296,7 @@ class FieldsOptions
      *
      * @param string|null $fieldPath
      * @return array
+     * @psalm-suppress PossiblyUnusedMethod
      */
     public function getIncludedFields(?string $fieldPath = null): array
     {

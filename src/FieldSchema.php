@@ -11,9 +11,14 @@ use Lucian\FieldsOptions\Attribute\Group;
 class FieldSchema
 {
     /**
-     * @var array<class-string, bool>
+     * Process-wide set of classes whose whole reachable graph has well-formed Group names.
+     * The only static state allowed here: attributes cannot change within a process and a class is
+     * added only after its entire top-level walk succeeded, so invalid classes keep throwing on every bind.
+     * Type-resolution caches must stay per instance (NestedTypeResolver / FieldSchemaCache).
+     *
+     * @var array<class-string, true>
      */
-    private static array $classAttributeCache = [];
+    private static array $validatedGroupClasses = [];
 
     /**
      * @param class-string $rootClass
@@ -21,17 +26,35 @@ class FieldSchema
     public function __construct(
         private readonly string $rootClass,
         private readonly NestedTypeResolver $resolver = new NestedTypeResolver(),
+        private readonly FieldSchemaCache $cache = new FieldSchemaCache(),
     ) {
         self::requireClass($rootClass);
+        $this->assertValidGroups($rootClass);
     }
 
-    public static function fromPrototype(object|string|array|null $prototype): ?self
-    {
+    /**
+     * @param NestedTypeResolver|null $resolver Reuse an existing resolver so type caches survive
+     *     forField() / withPrototype() copies. A new resolver is created only when omitted.
+     * @param FieldSchemaCache|null $cache Reuse property group caches the same way.
+     */
+    public static function fromPrototype(
+        object|string|array|null $prototype,
+        ?NestedTypeResolver $resolver = null,
+        ?FieldSchemaCache $cache = null,
+    ): ?self {
         if (is_object($prototype)) {
-            return new self($prototype::class);
+            return new self(
+                $prototype::class,
+                $resolver ?? new NestedTypeResolver(),
+                $cache ?? new FieldSchemaCache(),
+            );
         }
         if (is_string($prototype)) {
-            return new self(self::requireClass($prototype));
+            return new self(
+                self::requireClass($prototype),
+                $resolver ?? new NestedTypeResolver(),
+                $cache ?? new FieldSchemaCache(),
+            );
         }
 
         return null;
@@ -87,12 +110,7 @@ class FieldSchema
             return [];
         }
 
-        $groups = [];
-        foreach ($property->getAttributes(Group::class) as $attribute) {
-            $groups[] = $attribute->newInstance()->name;
-        }
-
-        return $groups;
+        return $this->instantiateGroups($property);
     }
 
     /**
@@ -101,19 +119,8 @@ class FieldSchema
     public function getFieldNames(?string $parentPath = null): array
     {
         $class = $this->resolver->resolveClass($this->rootClass, $parentPath);
-        if ($class === null) {
-            return [];
-        }
 
-        $names = [];
-        foreach ((new \ReflectionClass($class))->getProperties() as $property) {
-            if (str_starts_with($property->getName(), '__')) {
-                continue;
-            }
-            $names[] = $property->getName();
-        }
-
-        return $names;
+        return $class === null ? [] : $this->resolver->getFieldNames($class);
     }
 
     /**
@@ -132,20 +139,83 @@ class FieldSchema
         if ($class === null || !class_exists($class)) {
             return false;
         }
-        if (array_key_exists($class, self::$classAttributeCache)) {
-            return self::$classAttributeCache[$class];
-        }
 
         foreach ((new \ReflectionClass($class))->getProperties() as $property) {
+            if (!NestedTypeResolver::isFieldProperty($property)) {
+                continue;
+            }
             if (
                 $property->getAttributes(DefaultField::class) !== [] ||
                 $property->getAttributes(Group::class) !== []
             ) {
-                return self::$classAttributeCache[$class] = true;
+                return true;
             }
         }
 
-        return self::$classAttributeCache[$class] = false;
+        return false;
+    }
+
+    /**
+     * Reject invalid Group names while walking reachable DTO types at bind time.
+     *
+     * @param class-string $rootClass
+     */
+    private function assertValidGroups(string $rootClass): void
+    {
+        if (isset(self::$validatedGroupClasses[$rootClass])) {
+            return;
+        }
+
+        $walked = [];
+        $this->walkGroups($rootClass, $walked);
+        self::$validatedGroupClasses += $walked;
+    }
+
+    /**
+     * @param class-string $class
+     * @param array<class-string, true> $walked
+     */
+    private function walkGroups(string $class, array &$walked): void
+    {
+        if (isset(self::$validatedGroupClasses[$class]) || isset($walked[$class]) || !class_exists($class)) {
+            return;
+        }
+
+        $walked[$class] = true;
+        $reflection = new \ReflectionClass($class);
+        if ($reflection->isInternal()) {
+            return;
+        }
+
+        foreach ($reflection->getProperties() as $property) {
+            if (!NestedTypeResolver::isFieldProperty($property)) {
+                continue;
+            }
+            $this->instantiateGroups($property);
+            $child = $this->resolver->resolvePropertyClass($class, $property->getName());
+            if ($child !== null) {
+                $this->walkGroups($child, $walked);
+            }
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function instantiateGroups(\ReflectionProperty $property): array
+    {
+        $key = $property->class . '::' . $property->getName();
+        $cached = $this->cache->getPropertyGroups($key);
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $groups = [];
+        foreach ($property->getAttributes(Group::class) as $attribute) {
+            $groups[] = $attribute->newInstance()->name;
+        }
+
+        return $this->cache->setPropertyGroups($key, $groups);
     }
 
     private function getReflectionProperty(string $fieldPath): ?\ReflectionProperty
@@ -153,11 +223,8 @@ class FieldSchema
         $parent = $this->parentPath($fieldPath);
         $field = $this->lastSegment($fieldPath);
         $class = $this->resolver->resolveClass($this->rootClass, $parent);
-        if ($class === null || !$this->resolver->hasProperty($class, $field)) {
-            return null;
-        }
 
-        return (new \ReflectionClass($class))->getProperty($field);
+        return $class === null ? null : $this->resolver->getFieldProperty($class, $field);
     }
 
     private function parentPath(string $fieldPath): ?string

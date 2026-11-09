@@ -2,6 +2,7 @@
 
 namespace Lucian\FieldsOptions;
 
+use Lucian\FieldsOptions\Attribute\Ignore;
 use Symfony\Component\TypeInfo\Exception\UnsupportedException;
 use Symfony\Component\TypeInfo\Type;
 use Symfony\Component\TypeInfo\Type\BuiltinType;
@@ -21,6 +22,14 @@ use Symfony\Component\TypeInfo\TypeResolver\TypeResolver;
 class NestedTypeResolver
 {
     /**
+     * Process-wide #[Ignore] verdicts keyed by declaringClass::property. The only static state allowed here:
+     * attributes and class hierarchies cannot change within a process. Type-resolution caches stay per instance.
+     *
+     * @var array<string, bool>
+     */
+    private static array $ignoredDeclarations = [];
+
+    /**
      * @var array<string, \ReflectionClass>
      */
     private array $classCache = [];
@@ -36,9 +45,14 @@ class NestedTypeResolver
     private array $propertyKindCache = [];
 
     /**
-     * @var array<string, bool>
+     * @var array<string, \ReflectionProperty|null>
      */
-    private array $propertyExistsCache = [];
+    private array $fieldPropertyCache = [];
+
+    /**
+     * @var array<string, list<string>>
+     */
+    private array $fieldNamesCache = [];
 
     private TypeResolver $typeResolver;
     private TypeContextFactory $typeContextFactory;
@@ -109,16 +123,111 @@ class NestedTypeResolver
      */
     public function hasProperty(string $class, string $property): bool
     {
+        return $this->getFieldProperty($class, $property) !== null;
+    }
+
+    /**
+     * Reflection of a request field (see isFieldProperty()), or null when $class has no such field.
+     *
+     * @param class-string $class
+     */
+    public function getFieldProperty(string $class, string $property): ?\ReflectionProperty
+    {
         $key = $class . '::' . $property;
-        if (array_key_exists($key, $this->propertyExistsCache)) {
-            return $this->propertyExistsCache[$key];
+        if (array_key_exists($key, $this->fieldPropertyCache)) {
+            return $this->fieldPropertyCache[$key];
         }
 
         if (!class_exists($class)) {
-            return $this->propertyExistsCache[$key] = false;
+            return $this->fieldPropertyCache[$key] = null;
         }
 
-        return $this->propertyExistsCache[$key] = $this->getClass($class)->hasProperty($property);
+        $reflectionClass = $this->getClass($class);
+        if (!$reflectionClass->hasProperty($property)) {
+            return $this->fieldPropertyCache[$key] = null;
+        }
+
+        $reflectionProperty = $reflectionClass->getProperty($property);
+
+        return $this->fieldPropertyCache[$key] = self::isFieldProperty($reflectionProperty)
+            ? $reflectionProperty
+            : null;
+    }
+
+    /**
+     * Request field names of $class (see isFieldProperty()) in reflection order.
+     *
+     * @param class-string $class
+     * @return list<string>
+     */
+    public function getFieldNames(string $class): array
+    {
+        if (isset($this->fieldNamesCache[$class])) {
+            return $this->fieldNamesCache[$class];
+        }
+
+        $names = [];
+        foreach ($this->getClass($class)->getProperties() as $property) {
+            if (self::isFieldProperty($property)) {
+                $names[] = $property->getName();
+            }
+        }
+
+        return $this->fieldNamesCache[$class] = $names;
+    }
+
+    /**
+     * Whether a declared property is a request field: not static and not marked #[Ignore].
+     * #[Ignore] survives redeclaration: it counts when found on this declaration, on a trait the
+     * declaring class uses, or on the same-named non-private property of any ancestor.
+     * Every reflection loop over DTO properties must use this so schema, validator and applier agree.
+     */
+    public static function isFieldProperty(\ReflectionProperty $property): bool
+    {
+        if ($property->isStatic()) {
+            return false;
+        }
+
+        return !(self::$ignoredDeclarations[$property->class . '::' . $property->name]
+            ?? self::isIgnoredDeclaration($property));
+    }
+
+    private static function isIgnoredDeclaration(\ReflectionProperty $property): bool
+    {
+        $key = $property->class . '::' . $property->name;
+        if (isset(self::$ignoredDeclarations[$key])) {
+            return self::$ignoredDeclarations[$key];
+        }
+
+        $class = $property->getDeclaringClass();
+        $ignored = $property->getAttributes(Ignore::class) !== []
+            || self::traitDeclaresIgnore($class, $property->name);
+        if (!$ignored) {
+            $parent = $class->getParentClass();
+            if ($parent !== false && $parent->hasProperty($property->name)) {
+                $inherited = $parent->getProperty($property->name);
+                $ignored = !$inherited->isPrivate() && self::isIgnoredDeclaration($inherited);
+            }
+        }
+
+        return self::$ignoredDeclarations[$key] = $ignored;
+    }
+
+    /**
+     * A class redeclaring a property it also composes from a trait keeps only its own attributes.
+     */
+    private static function traitDeclaresIgnore(\ReflectionClass $class, string $property): bool
+    {
+        foreach ($class->getTraits() as $trait) {
+            if ($trait->hasProperty($property) && $trait->getProperty($property)->getAttributes(Ignore::class) !== []) {
+                return true;
+            }
+            if (self::traitDeclaresIgnore($trait, $property)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -134,11 +243,11 @@ class NestedTypeResolver
             return $this->propertyClassCache[$key];
         }
 
-        if (!$this->hasProperty($class, $property)) {
+        $reflectionProperty = $this->getFieldProperty($class, $property);
+        if ($reflectionProperty === null) {
             return $this->propertyClassCache[$key] = null;
         }
 
-        $reflectionProperty = $this->getClass($class)->getProperty($property);
         $resolved = $this->resolveFromProperty($reflectionProperty, $key);
 
         return $this->propertyClassCache[$key] = $resolved;

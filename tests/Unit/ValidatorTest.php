@@ -2,7 +2,18 @@
 
 namespace Lucian\FieldsOptions\Test\Unit;
 
+use Lucian\FieldsOptions\Test\Fixture\Attributed\IgnoreDto;
+use Lucian\FieldsOptions\Test\Fixture\Attributed\IgnoreGrandchildDto;
+use Lucian\FieldsOptions\Test\Fixture\Attributed\IgnorePrivateChildDto;
+use Lucian\FieldsOptions\Test\Fixture\Attributed\IgnoreRedeclaringDto;
+use Lucian\FieldsOptions\Test\Fixture\Attributed\IgnoreTraitRedeclaringDto;
+use Lucian\FieldsOptions\Test\Fixture\Attributed\IgnoreTraitUserChildDto;
+use Lucian\FieldsOptions\Test\Fixture\Attributed\IgnoreTraitUserDto;
+use Lucian\FieldsOptions\Test\Fixture\Attributed\ProfileDto as AttributedProfileDto;
+use Lucian\FieldsOptions\Test\Fixture\Attributed\StaticPropertyDto;
+use Lucian\FieldsOptions\Test\Fixture\Attributed\WorkplaceDto as AttributedWorkplaceDto;
 use Lucian\FieldsOptions\Test\Fixture\ProfileDto;
+use Lucian\FieldsOptions\Test\Fixture\WorkplaceDto;
 use Lucian\FieldsOptions\Validator;
 use Lucian\FieldsOptions\ValidatorInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -55,7 +66,7 @@ class ValidatorTest extends TestCase
             ['education.missing'],
             ['location2.missing'],
             ['location2.cityId.missing'],
-            //['__exportedProperties'],
+            ['__exportedProperties'],
             ['dateCreated.missing'],
         ];
     }
@@ -136,6 +147,71 @@ class ValidatorTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage("Invalid field path 'intList.foo'");
         $validator->validateField('intList.foo');
+    }
+
+    public function testValidateFieldRejectsStaticProperty(): void
+    {
+        $validator = new Validator(StaticPropertyDto::class);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Invalid field path 'secret'");
+        $validator->validateField('secret');
+    }
+
+    /**
+     * @param class-string $class
+     */
+    #[DataProvider('ignoredFieldsProvider')]
+    public function testValidateFieldRejectsIgnoredProperty(string $class, string $field): void
+    {
+        $validator = new Validator($class);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Invalid field path '$field'");
+        $validator->validateField($field);
+    }
+
+    public static function ignoredFieldsProvider(): array
+    {
+        return [
+            [IgnoreDto::class, 'internal'],
+            [IgnoreDto::class, 'ignoredDefault'],
+            [IgnoreDto::class, 'parentInternal'],
+            [IgnoreDto::class, 'ignoredInvalidChild'],
+            [IgnoreDto::class, 'ignoredInvalidChild.name'],
+            [IgnoreRedeclaringDto::class, 'parentInternal'],
+            [IgnoreRedeclaringDto::class, 'bookkeeping'],
+            [IgnoreGrandchildDto::class, '__state'],
+            [IgnoreGrandchildDto::class, '__flags'],
+            [IgnoreTraitUserDto::class, '__traitState'],
+            [IgnoreTraitRedeclaringDto::class, '__traitState'],
+            [IgnoreTraitUserChildDto::class, '__traitState'],
+            [ProfileDto::class, '__exportedProperties'],
+            [WorkplaceDto::class, '__exportedProperties'],
+            [AttributedProfileDto::class, '__exportedProperties'],
+            [AttributedWorkplaceDto::class, '__exportedProperties'],
+            [AttributedProfileDto::class, 'education.__exportedProperties'],
+        ];
+    }
+
+    public function testValidateFieldAcceptsPropertyShadowingPrivateIgnoredParent(): void
+    {
+        $this->expectNotToPerformAssertions();
+        (new Validator(IgnorePrivateChildDto::class))->validateField('secret');
+        (new Validator(IgnoreGrandchildDto::class))->validateField('secret');
+    }
+
+    public function testValidateDataRejectsIgnoredProperty(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Invalid field path 'internal'");
+        (new Validator(IgnoreDto::class))->validateData(['id' => true, 'internal' => true]);
+    }
+
+    public function testValidateFieldAcceptsDoubleUnderscorePropertyWithoutIgnore(): void
+    {
+        $this->expectNotToPerformAssertions();
+        (new Validator(IgnoreDto::class))->validateField('__legacy');
     }
 
     public function testGetPrototype(): void

@@ -8,8 +8,6 @@ class FieldsOptionsBuilder
 
     private ?ValidatorInterface $validator;
 
-    private object|string|null $prototype;
-
     /**
      * @param ValidatorInterface|null $validator
      * @param array $data
@@ -18,27 +16,14 @@ class FieldsOptionsBuilder
     public function __construct(
         ?ValidatorInterface $validator = null,
         array $data = [],
-        object|string|null $prototype = null,
     ) {
-        if ($prototype === null && $validator !== null) {
-            $extracted = $validator->getPrototype();
-            if (is_object($extracted) || is_string($extracted)) {
-                $prototype = $extracted;
-            }
-        }
-
-        if (is_string($prototype)) {
-            FieldSchema::requireClass($prototype);
-        }
-
         if ($data) {
-            $validator ??= new Validator($prototype);
+            $validator ??= new Validator();
             $validator->validateData($data);
         }
 
         $this->validator = $validator;
         $this->data = $data;
-        $this->prototype = $prototype;
     }
 
     /**
@@ -186,6 +171,6 @@ class FieldsOptionsBuilder
      */
     public function build(): FieldsOptions
     {
-        return new FieldsOptions($this->data, $this->validator, $this->prototype);
+        return new FieldsOptions($this->data, $this->validator);
     }
 }

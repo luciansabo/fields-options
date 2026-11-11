@@ -7,6 +7,8 @@ use Lucian\FieldsOptions\Attribute\Group;
 
 /**
  * Reads DefaultField / Group attributes by walking nested DTO types.
+ *
+ * @psalm-api
  */
 class FieldSchema
 {

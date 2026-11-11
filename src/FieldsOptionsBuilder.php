@@ -2,6 +2,7 @@
 
 namespace Lucian\FieldsOptions;
 
+/** @psalm-api */
 class FieldsOptionsBuilder
 {
     private array $data;

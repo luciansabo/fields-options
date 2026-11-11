@@ -2,6 +2,7 @@
 
 namespace Lucian\FieldsOptions;
 
+/** @psalm-api */
 interface ValidatorInterface
 {
     /** @throws \RuntimeException */

@@ -3,7 +3,7 @@
 namespace Lucian\FieldsOptions;
 
 /**
- * @psalm-suppress UnusedClass
+ * @psalm-api
  */
 class FieldsOptionsObjectApplier
 {

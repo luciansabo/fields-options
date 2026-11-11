@@ -4,6 +4,7 @@ namespace Lucian\FieldsOptions\Attribute;
 
 use Lucian\FieldsOptions\FieldsOptions;
 
+/** @psalm-api */
 #[\Attribute(\Attribute::TARGET_PROPERTY | \Attribute::IS_REPEATABLE)]
 final class Group
 {

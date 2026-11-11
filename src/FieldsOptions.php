@@ -4,6 +4,8 @@ namespace Lucian\FieldsOptions;
 
 /**
  * Holds a structure of wanted fields and their options
+ *
+ * @psalm-api
  */
 class FieldsOptions
 {

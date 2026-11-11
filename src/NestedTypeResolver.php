@@ -18,6 +18,8 @@ use Symfony\Component\TypeInfo\TypeResolver\TypeResolver;
 
 /**
  * Walks DTO property types (reflection + phpdoc) to resolve nested object classes.
+ *
+ * @psalm-api
  */
 class NestedTypeResolver
 {

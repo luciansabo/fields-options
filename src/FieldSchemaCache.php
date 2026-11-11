@@ -7,6 +7,7 @@ namespace Lucian\FieldsOptions;
  * FieldsOptions threads one instance through forField() / withPrototype(), matching NestedTypeResolver.
  *
  * @internal
+ * @psalm-api
  */
 final class FieldSchemaCache
 {

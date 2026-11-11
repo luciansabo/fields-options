@@ -4,6 +4,8 @@ namespace Lucian\FieldsOptions;
 
 /**
  * Simplistic Dot notation array extractor
+ *
+ * @psalm-api
  */
 class ArrayHelper
 {

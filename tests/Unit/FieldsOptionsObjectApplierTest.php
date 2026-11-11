@@ -5,13 +5,36 @@ namespace Lucian\FieldsOptions\Test\Unit;
 use Lucian\FieldsOptions\FieldsOptions;
 use Lucian\FieldsOptions\FieldsOptionsObjectApplier;
 use Lucian\FieldsOptions\FieldsOptionsBuilder;
+use Lucian\FieldsOptions\Test\Fixture\Attributed\EducationDto as AttributedEducationDto;
+use Lucian\FieldsOptions\Test\Fixture\Attributed\InvalidGroupNameDto;
+use Lucian\FieldsOptions\Test\Fixture\Attributed\NestedInvalidGroupDto;
+use Lucian\FieldsOptions\Test\Fixture\CustomValidator;
+use Lucian\FieldsOptions\Test\Fixture\Cycle\AttributedNode;
+use Lucian\FieldsOptions\Test\Fixture\Cycle\LegacyNode;
+use Lucian\FieldsOptions\Test\Fixture\LegacyFieldFilterDto;
+use Lucian\FieldsOptions\Test\Fixture\LocationDto;
 use Lucian\FieldsOptions\Test\Fixture\ProfileDto;
+use Lucian\FieldsOptions\Test\Fixture\RecordingExportApplier;
 use Lucian\FieldsOptions\Test\Fixture\SampleExportApplier;
+use Lucian\FieldsOptions\Test\Fixture\WorkplaceDto;
 use Lucian\FieldsOptions\Validator;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class FieldsOptionsObjectApplierTest extends TestCase
 {
+    private const PROFILE_FIELDS = [
+        'id',
+        'name',
+        'description',
+        'education',
+        'workHistory',
+        'location',
+        'location2',
+        'dateCreated',
+        '_text',
+    ];
+
     private FieldsOptionsObjectApplier $applier;
     private FieldsOptionsBuilder $builder;
     private ProfileDto $dto;
@@ -449,6 +472,747 @@ class FieldsOptionsObjectApplierTest extends TestCase
             'WeakMap correctly recognized different FieldsOptions for the same object'
         );
         $this->assertEquals('John', $result['name']);
+    }
+
+    /**
+     * Intentional divergence from 1.x, which passed the reflected property list for an `_all`-only request.
+     * v2 passes null ("export everything") and the result does not depend on a bound prototype.
+     */
+    public function testAllFieldsOnlyPassesNullUnlike1xRegardlessOfPrototype(): void
+    {
+        $withPrototype = $this->captureRawExportedFields(
+            new FieldsOptions(['_all' => true], new Validator(ProfileDto::class))
+        );
+        $withoutPrototype = $this->captureRawExportedFields(
+            new FieldsOptions(['_all' => true])
+        );
+
+        $this->assertNull($withPrototype);
+        $this->assertSame($withoutPrototype, $withPrototype);
+    }
+
+    public function testApplyLegacyAllFieldsWithExplicitFieldRawListIsUnchangedWithPrototype(): void
+    {
+        $data = ['_all' => true, 'name' => true];
+        $withPrototype = $this->captureRawExportedFields(
+            new FieldsOptions($data, new Validator(ProfileDto::class))
+        );
+        $withoutPrototype = $this->captureRawExportedFields(
+            new FieldsOptions($data)
+        );
+
+        $this->assertIsArray($withPrototype);
+        $this->assertSame($withoutPrototype, $withPrototype);
+        $this->assertSame($withPrototype, array_values(array_unique($withPrototype)));
+        $this->assertCount(1, array_keys($withPrototype, 'name', true));
+        $this->assertCount(1, array_keys($withPrototype, '_text', true));
+        $this->assertNotContains('__exportedProperties', $withPrototype);
+        $this->assertNotContains('__excludedProperties', $withPrototype);
+    }
+
+    public function testUnannotatedPrototypeDoesNotIncludeUnmarkedDefaults(): void
+    {
+        $fieldsOptions = new FieldsOptions(['_defaults' => true], new Validator($this->dto));
+        $this->assertSame(
+            [],
+            $fieldsOptions->getIncludedFields(),
+            'prototype is bound: schema-calculated defaults are empty for an unannotated class'
+        );
+
+        $this->assertSame(['id', 'name'], $this->captureRawExportedFields($fieldsOptions));
+        $this->applier->apply($this->dto, $fieldsOptions);
+        $this->assertEquals(
+            ['id' => 1, 'name' => 'John'],
+            $this->dto->jsonSerialize()
+        );
+    }
+
+    public function testUnannotatedEducationTrueStillExportsAllChildFields(): void
+    {
+        $fieldsOptions = $this->builder
+            ->setFieldIncluded('education', [])
+            ->build();
+
+        $this->applier->apply($this->dto, $fieldsOptions);
+        $encoded = json_decode(json_encode($this->dto), true);
+
+        $this->assertArrayHasKey('institutionId', $encoded['education'][0]);
+        $this->assertArrayHasKey('institutionName', $encoded['education'][0]);
+        $this->assertSame(['education'], array_keys($encoded));
+    }
+
+    public function testLegacyChildSliceIsDataOnlyAndSharesTypeCaches(): void
+    {
+        $root = new FieldsOptions(['education' => ['_basicInfo' => true]], new Validator(ProfileDto::class));
+        $slice = $root->sliceWithoutSchema('education');
+
+        $this->assertSame(['_basicInfo' => true], $slice->toArray());
+        $this->assertSame(['_basicInfo'], $slice->getIncludedFields(), 'no schema bound');
+        foreach (['typeResolver', 'schemaCache'] as $cache) {
+            $property = new \ReflectionProperty(FieldsOptions::class, $cache);
+            $this->assertNotNull($property->getValue($root));
+            $this->assertSame($property->getValue($root), $property->getValue($slice));
+            $this->assertSame(
+                $property->getValue($root),
+                $property->getValue($slice->withPrototype(new AttributedEducationDto()))
+            );
+        }
+    }
+
+    public function testLegacyChildSliceIsRevalidatedLike1x(): void
+    {
+        $fieldsOptions = new FieldsOptions(
+            ['education' => ['institutionName' => 'yes']],
+            new CustomValidator()
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Invalid field options');
+        $this->applier->apply($this->dto, $fieldsOptions);
+    }
+
+    /**
+     * 1.x built (and validated) a child slice only when it recursed into an object.
+     *
+     * @param list<mixed>|null $workHistory null keeps the sample's WorkplaceDto items
+     * @param list<string> $expected 1.x raw list for the root
+     */
+    #[DataProvider('legacySliceNotRecursedProvider')]
+    public function testLegacyChildSliceIsNotValidatedWithoutRecursionLike1x(
+        array $data,
+        ?array $workHistory,
+        array $expected
+    ): void {
+        $dto = ProfileDto::getSampleDto();
+        if ($workHistory !== null) {
+            $dto->workHistory = $workHistory;
+        }
+        $exportApplier = new RecordingExportApplier();
+
+        (new FieldsOptionsObjectApplier($exportApplier))->apply($dto, new FieldsOptions($data, new CustomValidator()));
+
+        $this->assertSame([[$dto, $expected]], $exportApplier->calls);
+    }
+
+    public static function legacySliceNotRecursedProvider(): array
+    {
+        return [
+            'string value' => [['description' => ['x' => 'yes']], null, ['description']],
+            'null object property' => [['location' => ['city' => 'yes']], null, ['location']],
+            'int value next to a valid field' => [['id' => ['x' => 1], 'name' => true], null, ['id', 'name']],
+            'empty collection' => [['workHistory' => ['id' => 'yes']], [], ['workHistory']],
+            'collection of scalars' => [['workHistory' => ['id' => 'yes']], ['a', 1, null], ['workHistory']],
+        ];
+    }
+
+    /**
+     * @param list<mixed>|null $workHistory null keeps the sample's WorkplaceDto items
+     */
+    #[DataProvider('legacySliceRecursedProvider')]
+    public function testLegacyChildSliceIsValidatedBeforeFirstNestedApply(array $data, ?array $workHistory): void
+    {
+        $dto = ProfileDto::getSampleDto();
+        if ($workHistory !== null) {
+            $dto->workHistory = $workHistory;
+        }
+        $exportApplier = new RecordingExportApplier();
+        $fieldsOptions = new FieldsOptions($data, new CustomValidator());
+
+        try {
+            (new FieldsOptionsObjectApplier($exportApplier))->apply($dto, $fieldsOptions);
+            $this->fail('Expected the nested slice to be rejected');
+        } catch (\RuntimeException $e) {
+            $this->assertStringStartsWith('Invalid field options', $e->getMessage());
+        }
+        $this->assertSame([], $exportApplier->calls);
+    }
+
+    public static function legacySliceRecursedProvider(): array
+    {
+        $workplace = new WorkplaceDto();
+        $workplace->id = 1;
+
+        return [
+            'object child' => [['location2' => ['city' => 'yes']], null],
+            'nested leaf under object child' => [['location2' => ['city' => ['x' => 'yes']]], null],
+            'collection of objects' => [['workHistory' => ['id' => 'yes']], null],
+            'object after scalars in a collection' => [['workHistory' => ['id' => 'yes']], ['a', null, $workplace]],
+        ];
+    }
+
+    public function testFailedApplyIsRetriedWithTheSameOptions(): void
+    {
+        $cases = [
+            'invalid nested slice' => [ProfileDto::getSampleDto(), ['location2' => ['city' => 'yes']]],
+            'invalid group on nested attributed class' => [new NestedInvalidGroupDto(), ['child' => true]],
+        ];
+        foreach ($cases as $name => [$dto, $data]) {
+            if ($dto instanceof NestedInvalidGroupDto) {
+                $dto->child = new InvalidGroupNameDto();
+            }
+            $applier = new FieldsOptionsObjectApplier(new SampleExportApplier());
+            $failures = 0;
+            for ($i = 0; $i < 2; $i++) {
+                try {
+                    $applier->apply($dto, new FieldsOptions($data, new CustomValidator()));
+                } catch (\RuntimeException | \InvalidArgumentException) {
+                    $failures++;
+                }
+            }
+
+            $this->assertSame(2, $failures, $name);
+        }
+    }
+
+    public function testFailedApplyForgetsEarlierSuccessfulApply(): void
+    {
+        $first = ['education' => ['institutionId' => true]];
+        $dto = ProfileDto::getSampleDto();
+        $applier = new FieldsOptionsObjectApplier(new SampleExportApplier());
+        $applier->apply($dto, new FieldsOptions($first));
+
+        try {
+            // education items are re-applied before location2 is rejected
+            $applier->apply($dto, new FieldsOptions(
+                ['education' => ['institutionName' => true], 'location2' => ['city' => 'yes']],
+                new CustomValidator()
+            ));
+            $this->fail('Expected the location2 slice to be rejected');
+        } catch (\RuntimeException) {
+        }
+        $applier->apply($dto, new FieldsOptions($first));
+
+        $fresh = ProfileDto::getSampleDto();
+        (new FieldsOptionsObjectApplier(new SampleExportApplier()))->apply($fresh, new FieldsOptions($first));
+        $this->assertSame(json_encode($fresh), json_encode($dto));
+        $this->assertSame(
+            ['education' => [['institutionId' => 3], ['institutionId' => 4]]],
+            json_decode((string) json_encode($dto), true)
+        );
+    }
+
+    public function testApplyLegacyRawListsHaveNoDuplicates(): void
+    {
+        $cases = [
+            [['_all' => true, 'name' => true, 'education' => true], self::PROFILE_FIELDS],
+            [['_defaults' => true, 'id' => true, 'description' => true], ['id', 'name', 'description']],
+            [['_defaults' => true, '_all' => true, 'id' => true], self::PROFILE_FIELDS],
+        ];
+        foreach ($cases as [$data, $expected]) {
+            $raw = $this->captureRawExportedFields(new FieldsOptions($data));
+
+            $this->assertSame($expected, $raw, json_encode($data));
+            $this->assertSame(array_values(array_unique($raw)), $raw, json_encode($data));
+        }
+    }
+
+    /**
+     * @param 'profile'|'filter'|'uninitialized' $graph
+     * @param list<array{string, list<string>|null}> $expected1x
+     */
+    #[DataProvider('legacy1xParityProvider')]
+    public function testApplyLegacyMatches1xRawCalls(string $graph, array $data, array $expected1x): void
+    {
+        $this->assertSame($expected1x, $this->recordLegacyCalls($graph, $data, false));
+        $this->assertSame($expected1x, $this->recordLegacyCalls($graph, $data, true));
+    }
+
+    /**
+     * Ground truth recorded from the 1.x line (master) with an applier that keeps every
+     * setExportedFields() call verbatim. Labels are paths in the fixture graph.
+     */
+    public static function legacy1xParityProvider(): array
+    {
+        return [
+            'empty' => ['profile', [], []],
+            'defaults true' => ['profile', ['_defaults' => true], [['root', ['id', 'name']]]],
+            'defaults false' => ['profile', ['_defaults' => false], [['root', []]]],
+            'all false' => ['profile', ['_all' => false], []],
+            'field true' => ['profile', ['name' => true], [['root', ['name']]]],
+            'field false' => ['profile', ['name' => false], []],
+            'field true and false' => ['profile', ['name' => true, 'id' => false], [['root', ['name']]]],
+            'fields all false' => ['profile', ['name' => false, 'id' => false], []],
+            'defaults minus field' => ['profile', ['_defaults' => true, 'name' => false], [['root', ['id']]]],
+            'defaults plus field' => [
+                'profile',
+                ['_defaults' => true, 'description' => true],
+                [['root', ['id', 'name', 'description']]],
+            ],
+            'defaults false plus field' => [
+                'profile',
+                ['_defaults' => false, 'description' => true],
+                [['root', ['description']]],
+            ],
+            'nested true' => ['profile', ['education' => true], [['root', ['education']]]],
+            'nested empty' => ['profile', ['education' => []], [['root', ['education']]]],
+            'nested slice' => [
+                'profile',
+                ['education' => ['institutionName' => true]],
+                [['education.0', ['institutionName']], ['education.1', ['institutionName']], ['root', ['education']]],
+            ],
+            'nested defaults false' => [
+                'profile',
+                ['education' => ['_defaults' => false]],
+                [['education.0', []], ['education.1', []], ['root', ['education']]],
+            ],
+            'nested all false' => ['profile', ['education' => ['_all' => false]], [['root', ['education']]]],
+            'nested defaults plus minus' => [
+                'profile',
+                ['workHistory' => ['_defaults' => true, 'startYear' => true, 'employerName' => false]],
+                [
+                    ['workHistory.0', ['id', 'startYear']],
+                    ['workHistory.1', ['id', 'startYear']],
+                    ['root', ['workHistory']],
+                ],
+            ],
+            'nested untyped slice and null object' => [
+                'profile',
+                ['location2' => ['city' => true], 'location' => true],
+                [['location2', ['city']], ['root', ['location', 'location2']]],
+            ],
+            'custom group only' => ['profile', ['_basicInfo' => true], [['root', []]]],
+            'custom group false' => ['profile', ['_basicInfo' => false], []],
+            'custom group plus field' => ['profile', ['_basicInfo' => true, 'name' => true], [['root', ['name']]]],
+            'nested custom group only' => [
+                'profile',
+                ['education' => ['_basicInfo' => true]],
+                [['education.0', []], ['education.1', []], ['root', ['education']]],
+            ],
+            'opt only' => ['profile', ['_opt' => ['lang' => 'en']], [['root', ['id', 'name']]]],
+            'opt false only' => ['profile', ['_opt' => false], []],
+            'field with opt' => ['profile', ['name' => ['_opt' => ['upper' => true]]], [['root', ['name']]]],
+            'underscore property' => ['profile', ['_text' => true], [['root', ['_text']]]],
+            'non dto object' => ['profile', ['dateCreated' => true], [['root', ['dateCreated']]]],
+            'filtered fixture nested' => [
+                'filter',
+                ['location' => ['city' => true], 'id' => true],
+                [['location', ['city']], ['root', ['id', 'location']]],
+            ],
+        ];
+    }
+
+    /**
+     * @param 'profile'|'filter'|'uninitialized' $graph
+     * @param list<array{string, list<string>|null}>|string $recorded1x 1.x calls, or the error 1.x threw
+     * @param list<array{string, list<string>|null}> $expected
+     */
+    #[DataProvider('legacy1xIntentionalDivergenceProvider')]
+    public function testApplyLegacyIntentionallyDivergesFrom1x(
+        string $graph,
+        array $data,
+        array|string $recorded1x,
+        array $expected,
+        bool $validWithPrototype = true
+    ): void {
+        $actual = $this->recordLegacyCalls($graph, $data, false);
+        $this->assertSame($expected, $actual);
+        $this->assertNotSame($recorded1x, $actual);
+
+        if (!$validWithPrototype) {
+            $this->expectException(\RuntimeException::class);
+        }
+        $this->assertSame($expected, $this->recordLegacyCalls($graph, $data, true));
+    }
+
+    public static function legacy1xIntentionalDivergenceProvider(): array
+    {
+        $profile1x = ['__exportedProperties', ...self::PROFILE_FIELDS, '__excludedProperties'];
+        $workplace1x = ['__exportedProperties', 'id', 'employerName', 'startYear', 'endYear', '__excludedProperties'];
+        $education1x = ['institutionId', 'institutionName', '__exportedProperties', '__excludedProperties'];
+
+        return [
+            // intentional: `_all`-only passes null instead of the reflected property list
+            'all only' => ['profile', ['_all' => true], [['root', $profile1x]], [['root', null]]],
+            'all only with opt' => [
+                'profile',
+                ['_all' => true, '_opt' => ['x' => 1]],
+                [['root', $profile1x]],
+                [['root', null]],
+            ],
+            'nested all only' => [
+                'profile',
+                ['education' => ['_all' => true]],
+                [['education.0', $education1x], ['education.1', $education1x], ['root', ['education']]],
+                [['education.0', null], ['education.1', null], ['root', ['education']]],
+            ],
+            'nested all only on defaults' => [
+                'profile',
+                ['_defaults' => true, '_all' => false, 'workHistory' => ['_all' => true]],
+                [
+                    ['workHistory.0', $workplace1x],
+                    ['workHistory.1', $workplace1x],
+                    ['root', ['id', 'name', 'workHistory']],
+                ],
+                [['workHistory.0', null], ['workHistory.1', null], ['root', ['id', 'name', 'workHistory']]],
+            ],
+            'non dto object all only' => [
+                'profile',
+                ['dateCreated' => ['_all' => true]],
+                [['dateCreated', []], ['root', ['dateCreated']]],
+                [['dateCreated', null], ['root', ['dateCreated']]],
+            ],
+
+            // intentional: static and #[Ignore] properties are not fields
+            'all with field' => [
+                'profile',
+                ['_all' => true, 'name' => true],
+                [['root', $profile1x]],
+                [['root', self::PROFILE_FIELDS]],
+            ],
+            'all with field false' => [
+                'profile',
+                ['_all' => true, 'name' => false],
+                [['root', array_values(array_diff($profile1x, ['name']))]],
+                [['root', array_values(array_diff(self::PROFILE_FIELDS, ['name']))]],
+            ],
+            'all with defaults' => [
+                'profile',
+                ['_all' => true, '_defaults' => true],
+                [['root', $profile1x]],
+                [['root', self::PROFILE_FIELDS]],
+            ],
+            'all with nested false field' => [
+                'profile',
+                ['_all' => true, 'education' => ['institutionName' => false]],
+                [['root', $profile1x]],
+                [['root', self::PROFILE_FIELDS]],
+            ],
+            'mixed' => [
+                'profile',
+                [
+                    '_all' => true,
+                    'education' => ['_all' => true, 'institutionName' => false],
+                    'workHistory' => ['_defaults' => true, 'endYear' => true],
+                    'location2' => ['_defaults' => false, 'city' => true],
+                ],
+                [
+                    ['education.0', ['institutionId', '__exportedProperties', '__excludedProperties']],
+                    ['education.1', ['institutionId', '__exportedProperties', '__excludedProperties']],
+                    ['workHistory.0', ['id', 'employerName', 'endYear']],
+                    ['workHistory.1', ['id', 'employerName', 'endYear']],
+                    ['location2', ['city']],
+                    ['root', $profile1x],
+                ],
+                [
+                    ['education.0', ['institutionId']],
+                    ['education.1', ['institutionId']],
+                    ['workHistory.0', ['id', 'employerName', 'endYear']],
+                    ['workHistory.1', ['id', 'employerName', 'endYear']],
+                    ['location2', ['city']],
+                    ['root', self::PROFILE_FIELDS],
+                ],
+            ],
+            'filtered fixture all with field' => [
+                'filter',
+                ['_all' => true, 'label' => true],
+                [[
+                    'root',
+                    [
+                        'instances',
+                        'internal',
+                        'id',
+                        'label',
+                        'location',
+                        '__exportedProperties',
+                        '__excludedProperties',
+                    ],
+                ]],
+                [['root', ['id', 'label', 'location']]],
+            ],
+            'filtered fixture defaults' => [
+                'filter',
+                ['_defaults' => true],
+                [['root', ['internal', 'id', 'label', 'location']]],
+                [['root', ['id', 'label', 'location']]],
+            ],
+            'filtered fixture static field' => [
+                'filter',
+                ['instances' => true],
+                [['root', ['instances']]],
+                [['root', []]],
+                false,
+            ],
+            'filtered fixture ignored field' => [
+                'filter',
+                ['internal' => true],
+                [['root', ['internal']]],
+                [['root', []]],
+                false,
+            ],
+
+            // intentional: uninitialized typed properties are listed but not read (1.x threw)
+            'uninitialized scalar' => [
+                'uninitialized',
+                ['id' => true],
+                self::uninitializedError('id'),
+                [['root', ['id']]],
+            ],
+            'uninitialized nested' => [
+                'uninitialized',
+                ['location' => ['city' => true], 'label' => true],
+                self::uninitializedError('location'),
+                [['root', ['label', 'location']]],
+            ],
+            'uninitialized all with field' => [
+                'uninitialized',
+                ['_all' => true, 'location' => true],
+                self::uninitializedError('location'),
+                [['root', ['id', 'label', 'location']]],
+            ],
+        ];
+    }
+
+    /**
+     * The apply cache keys on request data only; the result must not depend on whether a prototype
+     * was bound or on which variant ran first for the same object.
+     *
+     * @param list<string> $expected 1.x raw list
+     */
+    #[DataProvider('prototypeOrderProvider')]
+    public function testApplyCacheIsPrototypeInvariant(array $data, array $expected, bool $prototypeFirst): void
+    {
+        $exportApplier = new RecordingExportApplier();
+        $applier = new FieldsOptionsObjectApplier($exportApplier);
+        $dto = ProfileDto::getSampleDto();
+        $plain = new FieldsOptions($data);
+        $withPrototype = new FieldsOptions($data, new Validator(ProfileDto::class));
+
+        foreach ($prototypeFirst ? [$withPrototype, $plain] : [$plain, $withPrototype] as $fieldsOptions) {
+            $applier->apply($dto, $fieldsOptions);
+            $this->assertSame([$expected], $exportApplier->fieldsPassedFor($dto));
+        }
+
+        $fresh = ProfileDto::getSampleDto();
+        (new FieldsOptionsObjectApplier(new SampleExportApplier()))->apply($fresh, $plain);
+        $this->assertSame(json_encode($fresh), json_encode($dto));
+    }
+
+    public static function prototypeOrderProvider(): array
+    {
+        $cases = [
+            'custom group only' => [['_basicInfo' => true], []],
+            'opt only' => [['_opt' => ['lang' => 'en']], ['id', 'name']],
+            'defaults only' => [['_defaults' => true], ['id', 'name']],
+        ];
+
+        $provided = [];
+        foreach ($cases as $name => [$data, $expected]) {
+            $provided["$name, plain first"] = [$data, $expected, false];
+            $provided["$name, prototype first"] = [$data, $expected, true];
+        }
+
+        return $provided;
+    }
+
+    /**
+     * @param 'pair-link'|'self-link'|'pair-items' $topology
+     * @param 'legacy'|'attributed' $kindA
+     * @param 'legacy'|'attributed' $kindB
+     * @param list<array{string, list<string>|null}> $expected
+     */
+    #[DataProvider('cyclicGraphProvider')]
+    public function testApplyTerminatesOnCyclicGraph(
+        string $topology,
+        string $kindA,
+        string $kindB,
+        array $data,
+        array $expected
+    ): void {
+        $a = $this->node($kindA, 1);
+        $b = $topology === 'self-link' ? $a : $this->node($kindB, 2);
+        if ($topology === 'pair-items') {
+            $a->items = [$b];
+            $b->items = [$a];
+        } else {
+            $a->link = $b;
+            $b->link = $a;
+        }
+        $labels = new \WeakMap();
+        $labels[$b] = 'b';
+        $labels[$a] = 'a';
+
+        $exportApplier = new RecordingExportApplier();
+        (new FieldsOptionsObjectApplier($exportApplier))->apply($a, new FieldsOptions($data));
+
+        $this->assertSame($expected, $this->labelCalls($exportApplier, $labels));
+    }
+
+    public static function cyclicGraphProvider(): array
+    {
+        $all = ['id', 'name', 'link', 'items'];
+        $defaults = ['id', 'link', 'items'];
+
+        return [
+            'legacy pair, all' => [
+                'pair-link', 'legacy', 'legacy',
+                ['_all' => true, 'link' => ['_all' => true, 'link' => true]],
+                [['b', $all], ['a', $all]],
+            ],
+            'legacy pair, nested slices' => [
+                'pair-link', 'legacy', 'legacy',
+                ['link' => ['link' => ['name' => true]]],
+                [['a', ['name']], ['b', ['link']], ['a', ['link']]],
+            ],
+            'legacy pair, defaults' => [
+                'pair-link', 'legacy', 'legacy',
+                ['_defaults' => true, 'link' => ['_defaults' => true]],
+                [['b', $all], ['a', $all]],
+            ],
+            'legacy self, nested slices' => [
+                'self-link', 'legacy', 'legacy',
+                ['link' => ['link' => ['id' => true]]],
+                [['a', ['id']], ['a', ['link']], ['a', ['link']]],
+            ],
+            'legacy collection, all' => [
+                'pair-items', 'legacy', 'legacy',
+                ['items' => ['_all' => true, 'items' => ['name' => true]]],
+                [['a', ['name']], ['b', $all], ['a', ['items']]],
+            ],
+            'attributed pair, implicit defaults' => [
+                'pair-link', 'attributed', 'attributed',
+                [],
+                [['b', $defaults], ['a', $defaults]],
+            ],
+            'attributed pair, defaults and group' => [
+                'pair-link', 'attributed', 'attributed',
+                ['_defaults' => true, '_label' => true],
+                [['a', $defaults], ['b', $defaults], ['a', $all]],
+            ],
+            'attributed pair, all' => [
+                'pair-link', 'attributed', 'attributed',
+                ['_all' => true, 'link' => ['_all' => true, 'name' => false]],
+                [['b', $defaults], ['a', $defaults], ['b', $defaults], ['a', $all]],
+            ],
+            'attributed pair, nested slices' => [
+                'pair-link', 'attributed', 'attributed',
+                ['link' => ['link' => ['name' => true]]],
+                [['a', ['name']], ['b', ['link']], ['a', ['link']]],
+            ],
+            'attributed self, implicit defaults' => [
+                'self-link', 'attributed', 'attributed',
+                [],
+                [['a', $defaults]],
+            ],
+            'attributed self, all' => [
+                'self-link', 'attributed', 'attributed',
+                ['_all' => true, 'name' => true],
+                [['a', $defaults], ['a', $all]],
+            ],
+            'attributed collection, implicit defaults' => [
+                'pair-items', 'attributed', 'attributed',
+                [],
+                [['b', $defaults], ['a', $defaults]],
+            ],
+            'mixed pair from legacy, explicit' => [
+                'pair-link', 'legacy', 'attributed',
+                ['link' => true],
+                [['b', $defaults], ['a', ['link']]],
+            ],
+            'mixed pair from legacy, all' => [
+                'pair-link', 'legacy', 'attributed',
+                ['_all' => true, 'link' => ['_all' => true, 'name' => false]],
+                [['b', $defaults], ['a', $all]],
+            ],
+            'mixed pair from legacy, nested slices' => [
+                'pair-link', 'legacy', 'attributed',
+                ['link' => ['link' => ['link' => ['id' => true]]]],
+                [['b', ['id']], ['a', ['link']], ['b', ['link']], ['a', ['link']]],
+            ],
+            'mixed pair from attributed, implicit defaults' => [
+                'pair-link', 'attributed', 'legacy',
+                [],
+                [['a', $defaults]],
+            ],
+            'mixed collection from attributed, defaults' => [
+                'pair-items', 'attributed', 'legacy',
+                ['_defaults' => true, 'items' => ['_defaults' => true, 'items' => true]],
+                [['a', $defaults], ['b', $all], ['a', $defaults]],
+            ],
+        ];
+    }
+
+    private static function uninitializedError(string $property): string
+    {
+        return sprintf(
+            'Typed property %s::$%s must not be accessed before initialization',
+            LegacyFieldFilterDto::class,
+            $property
+        );
+    }
+
+    /**
+     * @param 'legacy'|'attributed' $kind
+     */
+    private function node(string $kind, int $id): LegacyNode|AttributedNode
+    {
+        return $kind === 'legacy' ? new LegacyNode($id) : new AttributedNode($id);
+    }
+
+    /**
+     * @param 'profile'|'filter'|'uninitialized' $graph
+     * @return list<array{string, list<string>|null}>
+     */
+    private function recordLegacyCalls(string $graph, array $data, bool $withPrototype): array
+    {
+        $labels = new \WeakMap();
+        if ($graph === 'profile') {
+            $root = ProfileDto::getSampleDto();
+            foreach ($root->education as $i => $education) {
+                $labels[$education] = "education.$i";
+            }
+            foreach ($root->workHistory as $i => $workplace) {
+                $labels[$workplace] = "workHistory.$i";
+            }
+            $labels[$root->location2] = 'location2';
+            $labels[$root->dateCreated] = 'dateCreated';
+        } else {
+            $root = new LegacyFieldFilterDto();
+            if ($graph === 'filter') {
+                $root->id = 7;
+                $root->location = new LocationDto();
+                $labels[$root->location] = 'location';
+            }
+        }
+        $labels[$root] = 'root';
+
+        $fieldsOptions = $withPrototype
+            ? new FieldsOptions($data, new Validator($root::class))
+            : new FieldsOptions($data);
+        $exportApplier = new RecordingExportApplier();
+        (new FieldsOptionsObjectApplier($exportApplier))->apply($root, $fieldsOptions);
+
+        return $this->labelCalls($exportApplier, $labels);
+    }
+
+    /**
+     * @param \WeakMap<object, string> $labels
+     * @return list<array{string, array|null}>
+     */
+    private function labelCalls(RecordingExportApplier $exportApplier, \WeakMap $labels): array
+    {
+        $calls = [];
+        foreach ($exportApplier->calls as [$data, $fields]) {
+            $calls[] = [is_object($data) ? ($labels[$data] ?? $data::class) : 'array', $fields];
+        }
+
+        return $calls;
+    }
+
+    /**
+     * Raw list the root ProfileDto receives (`null` = all fields).
+     *
+     * @return list<string>|null
+     */
+    private function captureRawExportedFields(FieldsOptions $fieldsOptions): ?array
+    {
+        $dto = ProfileDto::getSampleDto();
+        $exportApplier = new RecordingExportApplier();
+        (new FieldsOptionsObjectApplier($exportApplier))->apply($dto, $fieldsOptions);
+
+        $passed = $exportApplier->fieldsPassedFor($dto);
+        $this->assertCount(1, $passed);
+
+        return $passed[0];
     }
 
     private function getSampleDto(): ProfileDto

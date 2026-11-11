@@ -1,3 +1,29 @@
+### 2.0.0
+- `ValidatorInterface::getPrototype()` is required. `FieldsOptions` / `FieldsOptionsBuilder` read the inclusion prototype from the interface, not the concrete `Validator`. Custom implementations that omit it will not compile; implementations that already expose the method now get calculated inclusion.
+- `isFieldIncluded()` now returns the **effective** inclusion when a DTO prototype/class is provided (explicit request, `_all`, custom groups, `#[DefaultField]`). Without a prototype it also returns `true` for unlisted paths under `_all` at their scope (1.x returned `false`).
+- Added `isFieldExplicitlyIncluded()` for the previous `isFieldIncluded()` meaning. `isFieldSpecified()` is unchanged.
+- Added `#[DefaultField]` and `#[Group]` attributes. Nested types are resolved with `symfony/type-info` `^7.4 || ^8.0` and `phpstan/phpdoc-parser` (phpdoc collections, no populated sample required).
+- Added `#[Ignore]`: marks a property as not a field (never requestable, exported, validated or walked). It survives redeclaration: a subclass redeclaring a property whose non-private ancestor declaration or used trait carries `#[Ignore]` is still ignored. `#[DefaultField]` / `#[Group]` on an ignored property have no effect.
+- **BC:** `__`-prefixed property names are no longer special-cased anywhere (earlier 2.0 builds skipped them in some places). Such properties are ordinary fields unless marked `#[Ignore]`.
+- **Migration:** if your DTO base class keeps bookkeeping state in properties (e.g. `$__exportedProperties`, `$__excludedProperties`), add `#[Ignore]` on the base-class declarations once. Subclasses that redeclare them stay ignored.
+- `getIncludedFields()` with a prototype returns the effective field list (no meta keys). Without a prototype it stays explicit-only (request keys, as in 1.x). Callers that use it directly get different results once a `Validator` prototype is passed.
+- `Validator` accepts a class-string prototype. `FieldsOptions` / `FieldsOptionsBuilder` read the prototype from the validator (`ValidatorInterface::getPrototype()`); their constructor signatures are the same as in 1.x (`FieldsOptions($data, $validator)`, `FieldsOptionsBuilder($validator, $data)`), with no separate prototype argument. `Builder::build()` passes the validator on.
+- `FieldsOptions::withPrototype()` binds a prototype on a copy (request data unchanged). Used internally by the object applier; callers normally get the prototype from `Validator`.
+- `FieldsOptions::forField()` slices nested options and the resolved child class (not re-validated).
+- `FieldsOptions` reuses one `NestedTypeResolver` across `forField()` / `withPrototype()` so the attributed applier does not re-parse phpdoc for every object in a collection.
+- Type-resolution caches are per instance. `FieldsOptions` threads one `FieldSchemaCache` through `forField()` / `withPrototype()` like the type resolver. `FieldsOptionsObjectApplier` caches the attributed-vs-legacy class check per instance, capped by `MAX_REFLECTION_CACHE_SIZE`. The only process-wide caches are the `#[Group]` validation memo (below) and the `#[Ignore]` verdict per property declaration.
+- Locked `symfony/type-info` 7.4.x (`PHP >=8.2`) so `composer install` works on PHP 8.3. Constraint remains `^7.4 || ^8.0` for PHP 8.4+ consumers.
+- Validator rejects invalid nested collection fields from phpdoc/class-string (`education.missing`). Unresolvable types stay permissive (`mixed`, `object`, untyped `array`/`iterable`, multi-object unions, intersections).
+- Static and `#[Ignore]` properties are not request fields: they are omitted from `getFieldNames()` and both applier paths, and `NestedTypeResolver::hasProperty()` returns false so Validator rejects them as field paths (1.x accepted them).
+- Unresolvable class-string prototypes throw `InvalidArgumentException` instead of disabling field-path validation and calculated inclusion.
+- Invalid `#[Group]` names throw `InvalidArgumentException` when the prototype is bound (root and nested DTO types), not from `isFieldIncluded()`.
+- `#[Group]` validation is memoized process-wide per class: the first bind walks the reachable DTO graph (a few ms for a mid-sized graph), later binds skip it. A class is memoized only after its whole reachable graph validated; a class with an invalid name throws on every bind.
+- `FieldsOptionsObjectApplier` uses calculated inclusion only on classes that declare the new attributes. Unannotated objects keep pre-2.0 `getExportedFields()` defaults. `applyLegacy()` uses `isFieldExplicitlyIncluded()`, so its output is the same with or without a validator prototype and does not duplicate fields under `_all`.
+- The legacy (unannotated) apply path matches 1.x `setExportedFields()` output except for these intentional changes: `_all`-only requests (at any level, also with `_opt`) pass `null` instead of the reflected property list; static and `#[Ignore]` properties are never passed; uninitialized typed properties are listed but not read (1.x threw). A custom-group-only request (`{"_basicInfo": true}`) exports nothing on that path, as in 1.x, with or without a prototype. Nested options are re-validated exactly where 1.x re-validated them: only when recursing into an object value or an object item of a collection (scalars, `null` and empty or scalar-only collections are not checked).
+- A failed `apply()` (invalid nested options, invalid `#[Group]` name, …) no longer marks the object as applied: retrying with the same options runs again and throws again instead of being silently skipped (1.x skipped it).
+- **Migration:** replace `isFieldIncluded($f) || hasDefaultFields() || hasAllFields()` with `isFieldIncluded($f)` and pass a prototype. Callers that meant “explicitly listed as true” should use `isFieldExplicitlyIncluded()`.
+- Flex `extra.symfony.require` of `5.4.*` / `6.4.*` must exclude `symfony/type-info` (it has no 5.4/6.4 line; 7.4 installs beside those frameworks as a standalone package).
+
 ### 1.5.3
 - fixed setFieldOptions overwrites fields , added tests
 - added support for options in setFieldOptions, setFieldOption, getFieldOptions, getFieldOption
@@ -8,7 +34,7 @@
 - added `composer test` command to run composer install, phpunit, psalm and phpcs
 
 ### 1.5.1
-- added ExportApplierInterface::getSupportedFields()
+- added ExportApplierInterface::getSupportedClass()
 - applier fixes and improved docs
 - added more tests to cover more cases
 

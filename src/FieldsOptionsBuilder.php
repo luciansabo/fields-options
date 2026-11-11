@@ -2,6 +2,7 @@
 
 namespace Lucian\FieldsOptions;
 
+/** @psalm-api */
 class FieldsOptionsBuilder
 {
     private array $data;
@@ -13,8 +14,10 @@ class FieldsOptionsBuilder
      * @param array $data
      * @psalm-suppress PossiblyUnusedMethod
      */
-    public function __construct(?ValidatorInterface $validator = null, array $data = [])
-    {
+    public function __construct(
+        ?ValidatorInterface $validator = null,
+        array $data = [],
+    ) {
         if ($data) {
             $validator ??= new Validator();
             $validator->validateData($data);
@@ -169,6 +172,6 @@ class FieldsOptionsBuilder
      */
     public function build(): FieldsOptions
     {
-        return new FieldsOptions($this->data);
+        return new FieldsOptions($this->data, $this->validator);
     }
 }

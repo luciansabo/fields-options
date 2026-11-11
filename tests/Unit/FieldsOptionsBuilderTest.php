@@ -4,6 +4,7 @@ namespace Lucian\FieldsOptions\Test\Unit;
 
 use Lucian\FieldsOptions\FieldsOptions;
 use Lucian\FieldsOptions\FieldsOptionsBuilder;
+use Lucian\FieldsOptions\Test\Fixture\Attributed\IgnoreDto;
 use Lucian\FieldsOptions\Test\Fixture\LocationDto;
 use Lucian\FieldsOptions\Test\Fixture\ProfileDto;
 use Lucian\FieldsOptions\Validator;
@@ -42,7 +43,7 @@ class FieldsOptionsBuilderTest extends TestCase
         $this->assertTrue($fieldsOptions->isFieldIncluded('location.city'));
         $this->assertTrue($fieldsOptions->isFieldIncluded('location2.city'));
         $this->assertTrue($fieldsOptions->isFieldIncluded('education.institutionId'));
-        $this->assertEquals(['id', 'location', 'location2', 'education'], $fieldsOptions->getIncludedFields());
+        $this->assertEquals(['id', 'education', 'location', 'location2'], $fieldsOptions->getIncludedFields());
 
         // we currently can't properly validate iterables but this should work
         $this->builder->setFieldIncluded('education.institutionId');
@@ -114,7 +115,7 @@ class FieldsOptionsBuilderTest extends TestCase
             ['missing'],
             ['location.missing'],
             ['location2.missing', [], 'location2.missing'],
-            //['__exportedProperties'],
+            ['__exportedProperties', [], '__exportedProperties'],
             ['dateCreated.missing', [], 'dateCreated.missing'],
             [null, ['missing']],
             ['location', ['cityId', 'missing'], 'location.missing'],
@@ -246,5 +247,23 @@ class FieldsOptionsBuilderTest extends TestCase
         $this->assertTrue($fieldsOptions->hasDefaultFields('education'));
         $this->assertTrue($fieldsOptions->hasAllFields('workHistory'));
         $this->assertTrue($fieldsOptions->hasGroupField('_basicInfo', 'location2'));
+    }
+
+    public function testSetIgnoredFieldIncludedThrows(): void
+    {
+        $builder = new FieldsOptionsBuilder(new Validator(IgnoreDto::class));
+        $options = $builder->setFieldIncluded(null, ['id', '__legacy'])->build();
+        $this->assertSame(['id', '__legacy'], $options->getIncludedFields());
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage("Invalid field path 'parentInternal'");
+        $builder->setFieldIncluded('parentInternal');
+    }
+
+    public function testUnresolvablePrototypeClassThrows(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Unresolvable prototype class 'App\\Dto\\Typo'");
+        new FieldsOptionsBuilder(new Validator('App\\Dto\\Typo'));
     }
 }

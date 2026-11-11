@@ -2,6 +2,8 @@
 
 namespace Lucian\FieldsOptions\Test\Fixture;
 
+use Lucian\FieldsOptions\Attribute\Ignore;
+
 /**
  * AbstractDto - base class for any DTO
  *
@@ -38,7 +40,9 @@ abstract class AbstractDto implements \JsonSerializable, \IteratorAggregate
 {
     use MagicSetterTrait;
 
+    #[Ignore]
     protected ?array $__exportedProperties = null;
+    #[Ignore]
     protected array $__excludedProperties = [];
 
     /**

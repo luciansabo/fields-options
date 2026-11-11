@@ -4,6 +4,8 @@ namespace Lucian\FieldsOptions;
 
 /**
  * Holds a structure of wanted fields and their options
+ *
+ * @psalm-api
  */
 class FieldsOptions
 {
@@ -11,19 +13,31 @@ class FieldsOptions
     public const FIELD_DEFAULTS = '_defaults';
     public const FIELD_ALL = '_all';
     private array $data;
+    private ?FieldSchema $schema;
+    private ?NestedTypeResolver $typeResolver = null;
+    private ?FieldSchemaCache $schemaCache = null;
+    private static ?Validator $sliceValidator = null;
 
     public const DEFAULT_GROUPS = [
         self::FIELD_DEFAULTS,
         self::FIELD_ALL
     ];
 
-    public function __construct(array $data = [], ?ValidatorInterface $validator = null)
-    {
+    public function __construct(
+        array $data = [],
+        ?ValidatorInterface $validator = null,
+    ) {
+        $prototype = $validator?->getPrototype();
+        if (!is_object($prototype) && !is_string($prototype)) {
+            $prototype = null;
+        }
+
         if ($data) {
             $validator ??= new Validator();
             $validator->validateData($data);
         }
         $this->data = $data;
+        $this->schema = $this->schemaFor($prototype);
     }
 
     /**
@@ -40,12 +54,139 @@ class FieldsOptions
     }
 
     /**
-     * In addition to isFieldSpecified() this will also check if the field is set to `true`.
+     * Slice options for a nested field, carrying the resolved child prototype.
+     * Does not re-validate the subtree; inclusion schema is bound without a Validator.
+     */
+    public function forField(string $fieldPath): self
+    {
+        $nestedPrototype = $this->schema?->resolveClass($fieldPath);
+
+        return $this->copyWith($this->toArray($fieldPath), $nestedPrototype);
+    }
+
+    /**
+     * Data-only slice for a nested field, equivalent to `new FieldsOptions($this->toArray($fieldPath))`
+     * (no schema, subtree re-validated by the default Validator), but type and schema caches stay
+     * shared with this instance.
      *
-     * @param string $fieldPath
-     * @return bool
+     * @internal used by FieldsOptionsObjectApplier for unannotated parents
+     */
+    public function sliceWithoutSchema(string $fieldPath): self
+    {
+        $data = $this->toArray($fieldPath);
+        if ($data) {
+            (self::$sliceValidator ??= new Validator())->validateData($data);
+        }
+
+        $copy = clone $this;
+        $copy->data = $data;
+        $copy->schema = null;
+        $copy->typeResolver = $this->typeResolver();
+        $copy->schemaCache = $this->schemaCache();
+
+        return $copy;
+    }
+
+    /**
+     * Copy with $prototype bound so isFieldIncluded() can resolve DefaultField / Group.
+     * Request data is unchanged and not re-validated.
+     */
+    public function withPrototype(object|string $prototype): self
+    {
+        return $this->copyWith($this->data, $prototype);
+    }
+
+    /**
+     * @param object|string|null $prototype
+     */
+    private function copyWith(array $data, object|string|null $prototype): self
+    {
+        // Resolve on $this before clone so repeated withPrototype()/forField()
+        // (including the attributed applier) share NestedTypeResolver and FieldSchemaCache.
+        $hasPrototype = is_object($prototype) || is_string($prototype);
+        $resolver = $hasPrototype ? $this->typeResolver() : $this->typeResolver;
+        $schemaCache = $hasPrototype ? $this->schemaCache() : $this->schemaCache;
+
+        $copy = clone $this;
+        $copy->data = $data;
+        $copy->schema = FieldSchema::fromPrototype($prototype, $resolver, $schemaCache);
+
+        return $copy;
+    }
+
+    /**
+     * @param object|string|array|null $prototype
+     */
+    private function schemaFor(object|string|array|null $prototype): ?FieldSchema
+    {
+        if (!is_object($prototype) && !is_string($prototype)) {
+            return null;
+        }
+
+        return FieldSchema::fromPrototype($prototype, $this->typeResolver(), $this->schemaCache());
+    }
+
+    private function typeResolver(): NestedTypeResolver
+    {
+        return $this->typeResolver ??= new NestedTypeResolver();
+    }
+
+    private function schemaCache(): FieldSchemaCache
+    {
+        return $this->schemaCache ??= new FieldSchemaCache();
+    }
+
+    /**
+     * Effective inclusion: explicit request, _all, groups, and DefaultField at this scope.
      */
     public function isFieldIncluded(string $fieldPath): bool
+    {
+        if ($this->isMetaKey($fieldPath)) {
+            return $this->isFieldExplicitlyIncluded($fieldPath);
+        }
+
+        if ($this->schema === null) {
+            if ($this->isFieldSpecified($fieldPath)) {
+                return $this->isFieldExplicitlyIncluded($fieldPath);
+            }
+
+            return $this->scopeHasAllFields($this->parentPath($fieldPath));
+        }
+
+        $parent = $this->parentPath($fieldPath);
+        if ($parent !== null && !$this->isFieldIncluded($parent)) {
+            return false;
+        }
+
+        if ($this->isFieldSpecified($fieldPath)) {
+            return $this->isFieldExplicitlyIncluded($fieldPath);
+        }
+
+        if (!$this->schema->hasField($fieldPath)) {
+            return false;
+        }
+
+        if (!$this->schema->canResolveDeclaringClass($fieldPath)) {
+            return $this->isFieldExplicitlyIncluded($fieldPath);
+        }
+
+        if ($this->scopeHasAllFields($parent)) {
+            return true;
+        }
+
+        foreach ($this->schema->getGroups($fieldPath) as $group) {
+            if ($this->isFieldExplicitlyIncluded($this->groupPath($group, $parent))) {
+                return true;
+            }
+        }
+
+        return $this->scopeHasDefaultFields($parent) && $this->schema->isDefaultField($fieldPath);
+    }
+
+    /**
+     * Previous isFieldIncluded(): the path is present and not `false`.
+     */
+    public function isFieldExplicitlyIncluded(string $fieldPath): bool
     {
         return ArrayHelper::getValue($this->data, $fieldPath, false) !== false;
     }
@@ -115,7 +256,7 @@ class FieldsOptions
             throw new \InvalidArgumentException(sprintf('Field "%s" is not available', $path));
         }
 
-        return $this->isFieldIncluded($path);
+        return $this->isFieldExplicitlyIncluded($path);
     }
 
     /**
@@ -151,15 +292,39 @@ class FieldsOptions
     }
 
     /**
-     * Returns the list of actually explicitly included fields
-     * Does not know about defaults or groups. If a field is a default field it won't be returned here.
-     * This will probably change in future versions to also include the default fields or coming from group fields
-     * if they were included using the group
+     * Returns included field names for a path.
+     * With a schema this is the effective list (defaults, _all, groups, minus exclusions).
+     * Without a schema this is the explicitly included keys in the request data.
      *
      * @param string|null $fieldPath
      * @return array
+     * @psalm-suppress PossiblyUnusedMethod
      */
     public function getIncludedFields(?string $fieldPath = null): array
+    {
+        if ($this->schema !== null) {
+            if ($fieldPath && $this->schema->resolveClass($fieldPath) === null) {
+                return $this->getExplicitlyIncludedFields($fieldPath);
+            }
+
+            $fields = [];
+            foreach ($this->schema->getFieldNames($fieldPath) as $field) {
+                $path = $fieldPath ? ($fieldPath . '.' . $field) : $field;
+                if ($this->isFieldIncluded($path)) {
+                    $fields[] = $field;
+                }
+            }
+
+            return $fields;
+        }
+
+        return $this->getExplicitlyIncludedFields($fieldPath);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function getExplicitlyIncludedFields(?string $fieldPath): array
     {
         if ($fieldPath) {
             $this->assertFieldExists($fieldPath);
@@ -170,7 +335,7 @@ class FieldsOptions
         if (is_array($data)) {
             foreach ($data as $field => $_) {
                 $_fieldPath = $fieldPath ? ($fieldPath . '.' . $field) : $field;
-                if ($this->isFieldIncluded($_fieldPath)) {
+                if ($this->isFieldExplicitlyIncluded($_fieldPath)) {
                     $fields[] = $field;
                 }
             }
@@ -209,5 +374,75 @@ class FieldsOptions
             throw new \RuntimeException('Failed to encode data for hashing');
         }
         return md5($encoded);
+    }
+
+    private function isMetaKey(string $fieldPath): bool
+    {
+        $field = $this->lastSegment($fieldPath);
+        if ($field === self::OPTIONS_KEY) {
+            return true;
+        }
+        if (!str_starts_with($field, '_')) {
+            return false;
+        }
+        if ($this->schema !== null && $this->schema->hasField($fieldPath)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function scopeHasDefaultFields(?string $parentPath): bool
+    {
+        if ($parentPath === null) {
+            return $this->hasDefaultFields(null);
+        }
+        if (!$this->fieldExists($parentPath)) {
+            return true;
+        }
+        $value = ArrayHelper::getValue($this->data, $parentPath);
+        if ($value === true) {
+            return true;
+        }
+        if ($value === false) {
+            return false;
+        }
+
+        return $this->hasDefaultFields($parentPath);
+    }
+
+    private function scopeHasAllFields(?string $parentPath): bool
+    {
+        if ($parentPath === null) {
+            return $this->hasAllFields(null);
+        }
+        if (!$this->fieldExists($parentPath)) {
+            return false;
+        }
+        $value = ArrayHelper::getValue($this->data, $parentPath);
+        if (!is_array($value)) {
+            return false;
+        }
+
+        return $this->hasAllFields($parentPath);
+    }
+
+    private function groupPath(string $group, ?string $parentPath): string
+    {
+        return $parentPath ? ($parentPath . '.' . $group) : $group;
+    }
+
+    private function parentPath(string $fieldPath): ?string
+    {
+        $pos = strrpos($fieldPath, '.');
+
+        return $pos === false ? null : substr($fieldPath, 0, $pos);
+    }
+
+    private function lastSegment(string $fieldPath): string
+    {
+        $pos = strrpos($fieldPath, '.');
+
+        return $pos === false ? $fieldPath : substr($fieldPath, $pos + 1);
     }
 }
